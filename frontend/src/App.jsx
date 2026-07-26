@@ -67,7 +67,11 @@ export default function App() {
 
   function handleLogin(user) {
     setCurrentUser(user)
-    localStorage.setItem('currentUser', JSON.stringify(user))
+    try {
+      localStorage.setItem('currentUser', JSON.stringify(user))
+    } catch (error) {
+      console.error('localStorage error:', error)
+    }
   }
 
   function handleLogout() {

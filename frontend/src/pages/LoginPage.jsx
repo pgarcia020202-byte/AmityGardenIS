@@ -17,10 +17,18 @@ export default function Login({ onLogin }) {
 
     try {
       const response = await authAPI.login(username, password)
-      localStorage.setItem('token', response.token)
+      
+      // Handle localStorage errors on mobile
+      try {
+        localStorage.setItem('token', response.token)
+      } catch (storageError) {
+        throw new Error('Storage error. Please enable cookies/storage and try again.')
+      }
+      
       onLogin(response.user)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection error. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
@@ -113,7 +121,6 @@ export default function Login({ onLogin }) {
                     autoComplete="username"
                     className="w-full pl-10 pr-4 py-3 sm:py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     required
-                    autoFocus
                   />
                 </div>
               </div>

@@ -15,21 +15,36 @@ async function apiCall(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  })
+  // Add timeout for mobile networks
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 20000) // 20 second timeout
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'API request failed')
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'API request failed')
+    }
+
+    if (response.status === 204) {
+      return null
+    }
+
+    return response.json()
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      throw new Error('Connection timeout. Please check your internet and try again.')
+    }
+    throw error
   }
-
-  if (response.status === 204) {
-    return null
-  }
-
-  return response.json()
 }
 
 // Auth API
