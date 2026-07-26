@@ -1,6 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireAdminOrStaff } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -17,8 +17,8 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Create category (admin only)
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+// Create category (admin or staff)
+router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { name } = req.body;
 
@@ -56,8 +56,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Update category (admin only)
-router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+// Update category (admin or staff)
+router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
@@ -102,8 +102,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Delete category (admin only)
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+// Delete category (admin or staff)
+router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
 

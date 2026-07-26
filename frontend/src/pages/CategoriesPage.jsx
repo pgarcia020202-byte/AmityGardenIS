@@ -76,7 +76,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
     setDeleteTarget(null)
   }
 
-  const isAdmin = currentUser.role === 'admin'
+  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">
@@ -94,7 +94,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
               className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full sm:w-52"
             />
           </div>
-          {isAdmin && (
+          {canManage && (
             <button
               onClick={() => { setFormName(''); setError(''); setAddOpen(true) }}
               className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
@@ -130,7 +130,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
                 {productCount(cat.id)} product{productCount(cat.id) !== 1 ? 's' : ''}
               </span>
             </div>
-            {isAdmin && (
+            {canManage && (
               <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                 <button
                   onClick={() => { setEditTarget(cat); setFormName(cat.name); setError('') }}
@@ -160,7 +160,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category Name</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Products</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
-                {isAdmin && <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
+                {canManage && <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -188,7 +188,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
                   <td className="px-5 py-3.5 text-sm text-slate-400">
                     {new Date(cat.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
                   </td>
-                  {isAdmin && (
+                  {canManage && (
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button

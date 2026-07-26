@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { io } from 'socket.io-client'
 import LoginPage from './pages/LoginPage'
 import Layout from './layout/Layout'
 import DashboardPage from './pages/DashboardPage'
@@ -16,8 +15,6 @@ import {
   stockLogsAPI,
   usersAPI
 } from './services/api'
-
-const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000')
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -66,81 +63,6 @@ export default function App() {
     }
 
     loadData()
-
-    // Set up real-time updates via WebSocket
-    socket.on('sale:created', (newSale) => {
-      setSales(prev => [newSale, ...prev])
-      // Reload products and stock logs as they are updated automatically
-      Promise.all([
-        productAPI.getAll(),
-        stockLogsAPI.getAll()
-      ]).then(([productsData, logsData]) => {
-        setProducts(productsData)
-        setStockLogs(logsData)
-      })
-    })
-
-    socket.on('sale:deleted', (deletedSaleId) => {
-      setSales(prev => prev.filter(s => s.id !== deletedSaleId))
-      // Reload products and stock logs as they are updated automatically
-      Promise.all([
-        productAPI.getAll(),
-        stockLogsAPI.getAll()
-      ]).then(([productsData, logsData]) => {
-        setProducts(productsData)
-        setStockLogs(logsData)
-      })
-    })
-
-    socket.on('product:created', (newProduct) => {
-      setProducts(prev => [...prev, newProduct])
-    })
-
-    socket.on('product:updated', (updatedProduct) => {
-      setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p))
-    })
-
-    socket.on('product:deleted', (deletedProductId) => {
-      setProducts(prev => prev.filter(p => p.id !== deletedProductId))
-    })
-
-    socket.on('category:created', (newCategory) => {
-      setCategories(prev => [...prev, newCategory])
-    })
-
-    socket.on('category:updated', (updatedCategory) => {
-      setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c))
-    })
-
-    socket.on('category:deleted', (deletedCategoryId) => {
-      setCategories(prev => prev.filter(c => c.id !== deletedCategoryId))
-    })
-
-    socket.on('user:created', (newUser) => {
-      setUsers(prev => [...prev, newUser])
-    })
-
-    socket.on('user:updated', (updatedUser) => {
-      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u))
-    })
-
-    socket.on('user:deleted', (deletedUserId) => {
-      setUsers(prev => prev.filter(u => u.id !== deletedUserId))
-    })
-
-    return () => {
-      socket.off('sale:created')
-      socket.off('sale:deleted')
-      socket.off('product:created')
-      socket.off('product:updated')
-      socket.off('product:deleted')
-      socket.off('category:created')
-      socket.off('category:updated')
-      socket.off('category:deleted')
-      socket.off('user:created')
-      socket.off('user:updated')
-      socket.off('user:deleted')
-    }
   }, [currentUser])
 
   function handleLogin(user) {

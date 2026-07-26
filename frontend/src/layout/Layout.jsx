@@ -6,7 +6,7 @@ import {
 
 const NAV_ITEMS = [
   { page: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { page: 'categories', label: 'Categories', icon: <Tag size={18} />, adminOnly: true },
+  { page: 'categories', label: 'Categories', icon: <Tag size={18} /> },
   { page: 'products', label: 'Products', icon: <Package size={18} /> },
   { page: 'sales', label: 'Sales', icon: <ShoppingBag size={18} /> },
   { page: 'stock-logs', label: 'Stock Logs', icon: <ClipboardList size={18} /> },
