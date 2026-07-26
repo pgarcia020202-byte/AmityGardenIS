@@ -112,7 +112,13 @@ router.post('/', authenticate, async (req, res) => {
       GROUP BY s.id
     `, [sale.id]);
 
-    res.status(201).json(completeResult.rows[0]);
+    const newSale = completeResult.rows[0];
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('sale:created', newSale);
+
+    res.status(201).json(newSale);
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Create sale error:', error);
@@ -181,6 +187,10 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     await client.query('DELETE FROM sales WHERE id = $1', [id]);
 
     await client.query('COMMIT');
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('sale:deleted', id);
 
     res.status(204).send();
   } catch (error) {

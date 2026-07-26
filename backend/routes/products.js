@@ -77,6 +77,10 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('product:created', product);
+
     res.status(201).json(product);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -157,6 +161,10 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('product:updated', updatedProduct);
+
     res.json(updatedProduct);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -179,6 +187,10 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     }
 
     await pool.query('DELETE FROM products WHERE id = $1', [id]);
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('product:deleted', id);
 
     res.status(204).send();
   } catch (error) {

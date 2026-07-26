@@ -69,7 +69,13 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       [name, username, passwordHash, userRole]
     );
 
-    res.status(201).json(result.rows[0]);
+    const newUser = result.rows[0];
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('user:created', newUser);
+
+    res.status(201).json(newUser);
   } catch (error) {
     console.error('Create user error:', error);
     res.status(500).json({ error: 'Failed to create user' });
@@ -137,7 +143,13 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING id, name, username, role, created_at`;
 
     const result = await pool.query(query, values);
-    res.json(result.rows[0]);
+    const updatedUser = result.rows[0];
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('user:updated', updatedUser);
+
+    res.json(updatedUser);
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
@@ -165,6 +177,10 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 
     // Delete user
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('user:deleted', id);
 
     res.status(204).send();
   } catch (error) {
