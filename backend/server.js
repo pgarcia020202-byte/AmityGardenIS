@@ -27,7 +27,7 @@ app.use('/api/users', userRoutes);
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'StoreTrack API is running' });
+  res.json({ message: 'Amity Garden API is running' });
 });
 
 // 404 handler
