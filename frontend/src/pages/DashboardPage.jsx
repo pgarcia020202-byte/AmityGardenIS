@@ -49,7 +49,7 @@ export default function Dashboard({ categories, products, sales, stockLogs, onNa
     const now = new Date()
     return d.toDateString() === now.toDateString()
   })
-  const todayRevenue = todaySales.reduce((s, sale) => s + sale.total, 0)
+  const todayRevenue = todaySales.reduce((s, sale) => s + parseFloat(sale.total || 0), 0)
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">

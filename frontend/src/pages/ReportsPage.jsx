@@ -94,7 +94,7 @@ function useIsMobile() {
 }
 
 export default function Reports({ products, sales, categories }) {
-  const [timeRange, setTimeRange] = useState('7d')
+  const [timeRange, setTimeRange] = useState('today')
   const isMobile = useIsMobile()
 
   const rangeDays = getRangeDays(timeRange)
@@ -163,7 +163,7 @@ export default function Reports({ products, sales, categories }) {
 
         return {
           date: hourLabel,
-          sales: hourSales.reduce((sum, s) => sum + s.total, 0),
+          sales: hourSales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0),
         }
       })
     }
@@ -189,7 +189,7 @@ export default function Reports({ products, sales, categories }) {
         
         weeks.push({
           date: `Week ${weekNum}`,
-          sales: weekSales.reduce((sum, s) => sum + s.total, 0),
+          sales: weekSales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0),
         })
         
         currentWeekStart = new Date(currentWeekEnd)
@@ -218,7 +218,7 @@ export default function Reports({ products, sales, categories }) {
         
         months.push({
           date: monthName,
-          sales: monthSales.reduce((sum, s) => sum + s.total, 0),
+          sales: monthSales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0),
         })
       }
       
@@ -247,7 +247,7 @@ export default function Reports({ products, sales, categories }) {
 
       return {
         date: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
-        sales: daySales.reduce((sum, s) => sum + s.total, 0),
+        sales: daySales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0),
       }
     })
   }, [filteredSales, timeRange])
@@ -442,7 +442,7 @@ export default function Reports({ products, sales, categories }) {
         {topProducts.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-16">No product sales in this period</p>
         ) : (
-          <ResponsiveContainer width="100%" height={isMobile ? 280 : 300}>
+          <ResponsiveContainer width="100%" height={isMobile ? 150 : 170}>
             <BarChart data={topProducts} layout="vertical" margin={isMobile ? { left: -10 } : undefined}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
               <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
