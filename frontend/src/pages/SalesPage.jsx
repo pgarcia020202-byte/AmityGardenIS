@@ -241,7 +241,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
       })
 
       // Footer with total
-      const totalRevenue = filteredData.reduce((sum, s) => sum + s.total, 0)
+      const totalRevenue = filteredData.reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0)
       const footerY = currentY + 5
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
@@ -574,8 +574,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
               <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
                 {viewTarget.items.map((item, idx) => {
-                  const product = products.find(p => p.name === item.productName)
-                  const price = item.price || (product ? product.price : 0)
+                  const price = item.unitPrice || 0
                   return (
                     <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2">
                       <div className="flex-1 min-w-0 truncate">

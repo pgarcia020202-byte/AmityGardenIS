@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Package, ShoppingBag, Calendar, Download } from 'lucide-react'
+import { TrendingUp, Package, ShoppingBag, Calendar } from 'lucide-react'
 
 const COLORS = ['#eab308', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4']
 
@@ -265,30 +265,6 @@ export default function Reports({ products, sales, categories }) {
   )
   const totalStockValue = products.reduce((sum, p) => sum + p.current_stock * parseFloat(p.price), 0)
 
-  function handleExport() {
-    const rows = [
-      ['Date', 'Cashier', 'Items', 'Total (PHP)'],
-      ...filteredSales.map(s => [
-        new Date(s.date).toLocaleString('en-PH'),
-        s.user_name,
-        s.items.map(i => `${i.productName} x${i.qty}`).join('; '),
-        parseFloat(s.total).toFixed(2),
-      ]),
-    ]
-
-    const csv = rows
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `storetrack-sales-${timeRange}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -309,13 +285,6 @@ export default function Reports({ products, sales, categories }) {
             <option value="lastMonth">Last Month</option>
             <option value="thisYear">This Year</option>
           </select>
-          <button
-            onClick={handleExport}
-            disabled={filteredSales.length === 0}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 sm:py-2 rounded-lg text-sm text-slate-600"
-          >
-            <Download size={14} /> Export
-          </button>
         </div>
       </div>
 

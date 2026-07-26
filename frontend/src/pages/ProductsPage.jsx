@@ -141,7 +141,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
     setError('')
   }
 
-  const isAdmin = currentUser.role === 'admin'
+  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">
@@ -181,12 +181,14 @@ export default function Products({ products, categories, currentUser, onAdd, onE
               <option value="Out of Stock">Out of Stock</option>
             </select>
           </div>
-          <button
-            onClick={() => { resetForm(); setAddOpen(true) }}
-            className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200"
-          >
-            <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> Add Product
-          </button>
+          {canManage && (
+            <button
+              onClick={() => { resetForm(); setAddOpen(true) }}
+              className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> Add Product
+            </button>
+          )}
         </div>
       </div>
 
@@ -234,7 +236,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
                   <p className="text-sm font-mono text-slate-600 mt-0.5">{p.total_sold}</p>
                 </div>
               </div>
-              {isAdmin && (
+              {canManage && (
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                   <button
                     onClick={() => openEdit(p)}
@@ -268,7 +270,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Stock</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Sold</th>
-                {isAdmin && <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
+                {canManage && <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -306,7 +308,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-sm font-mono text-slate-600">{p.total_sold}</td>
-                    {isAdmin && (
+                    {canManage && (
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -481,13 +483,27 @@ export default function Products({ products, categories, currentUser, onAdd, onE
       {deleteTarget && (
         <Modal title="Delete Product" onClose={() => setDeleteTarget(null)}>
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span>?
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
-              <button onClick={handleDelete} disabled={loading} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-rose-500/25 rounded-lg text-sm text-white font-medium transition-all duration-200">Delete</button>
-            </div>
+            {deleteTarget.current_stock > 0 ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Cannot delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span> because it has {deleteTarget.current_stock} remaining stock.
+                </p>
+                <p className="text-sm text-rose-600">
+                  Please reduce the stock to 0 before deleting this product.
+                </p>
+                <button onClick={() => setDeleteTarget(null)} className="w-full py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Close</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Are you sure you want to delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span>?
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
+                  <button onClick={handleDelete} disabled={loading} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-rose-500/25 rounded-lg text-sm text-white font-medium transition-all duration-200">Delete</button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

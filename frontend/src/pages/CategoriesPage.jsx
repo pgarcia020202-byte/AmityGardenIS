@@ -274,18 +274,27 @@ export default function Categories({ categories, products, currentUser, onAdd, o
       {deleteTarget && (
         <Modal title="Delete Category" onClose={() => setDeleteTarget(null)}>
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span>?
-              {productCount(deleteTarget.id) > 0 && (
-                <span className="block mt-2 text-amber-600">
-                  ⚠ This category has {productCount(deleteTarget.id)} product{productCount(deleteTarget.id) !== 1 ? 's' : ''}. They will become uncategorized.
-                </span>
-              )}
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
-              <button onClick={handleDelete} disabled={loading} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-rose-500/25 rounded-lg text-sm text-white font-medium transition-all duration-200">Delete</button>
-            </div>
+            {productCount(deleteTarget.id) > 0 ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Cannot delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span> because it has products assigned to it.
+                </p>
+                <p className="text-sm text-rose-600">
+                  Please reassign or delete the {productCount(deleteTarget.id)} product{productCount(deleteTarget.id) !== 1 ? 's' : ''} in this category first.
+                </p>
+                <button onClick={() => setDeleteTarget(null)} className="w-full py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Close</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Are you sure you want to delete <span className="font-semibold text-slate-900">"{deleteTarget.name}"</span>?
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
+                  <button onClick={handleDelete} disabled={loading} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-rose-500/25 rounded-lg text-sm text-white font-medium transition-all duration-200">Delete</button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

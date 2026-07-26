@@ -1,6 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireAdminOrStaff } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -20,8 +20,8 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// Create product (admin only)
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+// Create product (admin or staff)
+router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
   const client = await pool.connect();
   
   try {
@@ -91,8 +91,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Update product (admin only)
-router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+// Update product (admin or staff)
+router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   const client = await pool.connect();
   
   try {
@@ -175,15 +175,22 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Delete product (admin only)
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+// Delete product (admin or staff)
+router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
 
     // Check if product exists
-    const existing = await pool.query('SELECT id FROM products WHERE id = $1', [id]);
+    const existing = await pool.query('SELECT id, name, current_stock FROM products WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = existing.rows[0];
+
+    // Check if product has remaining stock
+    if (product.current_stock > 0) {
+      return res.status(400).json({ error: `Cannot delete product "${product.name}" with ${product.current_stock} remaining stock. Please reduce stock to 0 first.` });
     }
 
     await pool.query('DELETE FROM products WHERE id = $1', [id]);

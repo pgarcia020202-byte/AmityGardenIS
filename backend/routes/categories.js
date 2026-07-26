@@ -113,8 +113,11 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
-    // Update products to remove category reference
-    await pool.query('UPDATE products SET category_id = NULL WHERE category_id = $1', [id]);
+    // Check if category has products
+    const products = await pool.query('SELECT id FROM products WHERE category_id = $1', [id]);
+    if (products.rows.length > 0) {
+      return res.status(400).json({ error: 'Cannot delete category with products. Please reassign or delete the products first.' });
+    }
 
     // Delete category
     await pool.query('DELETE FROM categories WHERE id = $1', [id]);
