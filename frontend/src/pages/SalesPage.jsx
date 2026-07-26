@@ -394,7 +394,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
                   <td className="px-5 py-3.5 text-right">
                     <button
                       onClick={() => setViewTarget(sale)}
-                      className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200"
+                      className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
                       title="View"
                     >
                       <Eye size={13} className="group-hover:scale-110 transition-transform" />
