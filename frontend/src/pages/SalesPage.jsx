@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Clock, X, Check, AlertCircle, Trash2, Eye, Download } from 'lucide-react'
+import { Plus, Search, Clock, X, Check, AlertCircle, Eye, Download } from 'lucide-react'
 import jsPDF from 'jspdf'
 
 function Modal({ title, onClose, children }) {
@@ -16,10 +16,9 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-export default function Sales({ sales, products, categories, currentUser, onAdd, onDelete }) {
+export default function Sales({ sales, products, categories, currentUser, onAdd }) {
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState(null)
   const [viewTarget, setViewTarget] = useState(null)
   const [cart, setCart] = useState([])
   const [error, setError] = useState('')
@@ -99,18 +98,6 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
     }
   }
 
-  async function handleDelete() {
-    if (loading || !deleteTarget) return
-    setLoading(true)
-    try {
-      await onDelete(deleteTarget.id)
-      setDeleteTarget(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete sale')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function addToCart(productId) {
     const existing = cart.find(c => c.productId === productId)
@@ -356,12 +343,6 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
               >
                 <Eye size={13} /> View
               </button>
-              <button
-                onClick={() => setDeleteTarget(sale)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200 border border-slate-200"
-              >
-                <Trash2 size={13} /> Delete
-              </button>
             </div>
           </div>
         ))}
@@ -411,24 +392,14 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                     <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total)}</span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setViewTarget(sale)}
-                        className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200"
-                        title="View"
-                      >
-                        <Eye size={13} className="group-hover:scale-110 transition-transform" />
-                        <span className="hidden lg:inline">View</span>
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(sale)}
-                        className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200 border border-transparent hover:border-rose-200"
-                        title="Delete"
-                      >
-                        <Trash2 size={13} className="group-hover:scale-110 transition-transform" />
-                        <span className="hidden lg:inline">Delete</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setViewTarget(sale)}
+                      className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200"
+                      title="View"
+                    >
+                      <Eye size={13} className="group-hover:scale-110 transition-transform" />
+                      <span className="hidden lg:inline">View</span>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -587,20 +558,6 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
         </Modal>
       )}
 
-      {/* Delete Confirm */}
-      {deleteTarget && (
-        <Modal title="Delete Sale" onClose={() => setDeleteTarget(null)}>
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Are you sure you want to delete this sale from <span className="font-semibold text-slate-900">{formatDate(deleteTarget.date)}</span>?
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
-              <button onClick={handleDelete} disabled={loading} className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-rose-500/25 rounded-lg text-sm text-white font-medium transition-all duration-200">Delete</button>
-            </div>
-          </div>
-        </Modal>
-      )}
 
       {/* View Sale */}
       {viewTarget && (

@@ -179,7 +179,7 @@ export default function App() {
       case 'products':
         return <ProductsPage products={products} categories={categories} currentUser={currentUser} onAdd={handleAddProduct} onEdit={handleEditProduct} onDelete={handleDeleteProduct} />
       case 'sales':
-        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} onDelete={handleDeleteSale} />
+        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} />
       case 'stock-logs':
         return <StockLogsPage stockLogs={stockLogs} />
       case 'reports':
