@@ -37,18 +37,24 @@ export default function App() {
       if (!currentUser) return
       
       try {
-        const [categoriesData, productsData, salesData, stockLogsData, usersData] = await Promise.all([
+        const [categoriesData, productsData, salesData, stockLogsData] = await Promise.all([
           categoryAPI.getAll(),
           productAPI.getAll(),
           salesAPI.getAll(),
           stockLogsAPI.getAll(),
-          usersAPI.getAll(),
         ])
         setCategories(categoriesData)
         setProducts(productsData)
         setSales(salesData)
         setStockLogs(stockLogsData)
-        setUsers(usersData)
+        
+        // Only fetch users if admin
+        if (currentUser.role === 'admin') {
+          const usersData = await usersAPI.getAll()
+          setUsers(usersData)
+        } else {
+          setUsers([])
+        }
       } catch (error) {
         console.error('Error loading data:', error)
       }
