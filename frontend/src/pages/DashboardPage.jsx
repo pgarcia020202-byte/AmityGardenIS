@@ -140,7 +140,7 @@ export default function Dashboard({ categories, products, sales, stockLogs, onNa
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{sale.user_name}</p>
                     <p className="text-xs text-slate-400 mt-0.5 truncate">
-                      {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} — {sale.items.map(i => i.productName.split(' ')[0]).join(', ')}
+                      {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} — {sale.items.map(i => i.productName).join(', ')}
                     </p>
                   </div>
                 </div>
