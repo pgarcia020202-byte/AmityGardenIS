@@ -171,6 +171,10 @@ export const salesAPI = {
     return apiCall(`/sales/${id}`, {
       method: 'DELETE'
     })
+  },
+    return apiCall(`/sales/${id}`, {
+      method: 'DELETE'
+    })
   }
 }
 

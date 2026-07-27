@@ -387,6 +387,23 @@ export default function App() {
     setStockLogs(logsData)
   }
 
+  async function handleEditSale(updatedSale) {
+    const id = normalizeId(updatedSale.id)
+    setSales((prev) => prev.map((entry) => (normalizeId(entry.id) === id ? updatedSale : entry)))
+
+    // Reload products and stock logs because editing a sale may affect inventory and logs
+    try {
+      const [productsData, logsData] = await Promise.all([
+        productAPI.getAll(),
+        stockLogsAPI.getAll()
+      ])
+      setProducts(productsData)
+      setStockLogs(logsData)
+    } catch (err) {
+      console.error('Failed to refresh products or stock logs after editing sale:', err)
+    }
+  }
+
   async function handleDeleteSale(id) {
     await salesAPI.delete(id)
     setSales((prev) => prev.filter((entry) => entry.id !== id))
@@ -428,7 +445,7 @@ export default function App() {
       case 'products':
         return <ProductsPage products={products} categories={categories} currentUser={currentUser} onAdd={handleAddProduct} onEdit={handleEditProduct} onDelete={handleDeleteProduct} />
       case 'sales':
-        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} />
+        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} onEdit={handleEditSale} />
       case 'stock-logs':
         return <StockLogsPage stockLogs={stockLogs} />
       case 'reports':

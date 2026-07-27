@@ -16,10 +16,12 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-export default function Sales({ sales, products, categories, currentUser, onAdd }) {
+export default function Sales({ sales, products, categories, currentUser, onAdd, onEdit }) {
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
+  const [viewItems, setViewItems] = useState([])
+  const [isEditingView, setIsEditingView] = useState(false)
   const [cart, setCart] = useState([])
   const [error, setError] = useState('')
   const [productSearch, setProductSearch] = useState('')
@@ -29,6 +31,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
+  const isOwner = currentUser?.role === 'admin' || currentUser?.role === 'owner'
 
   const filtered = sales.filter(s => {
     const matchesSearch =
@@ -118,6 +121,41 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
 
   function removeFromCart(productId) {
     setCart(cart.filter(c => c.productId !== productId))
+  }
+
+  function openViewSale(sale) {
+    setViewTarget(sale)
+    setViewItems(sale.items.map(item => ({ ...item })))
+    setIsEditingView(false)
+  }
+
+  function updateViewItemQty(index, qty) {
+    setViewItems(prev => prev.map((item, i) => i === index ? { ...item, qty: Math.max(1, qty) } : item))
+  }
+
+  function removeViewItem(index) {
+    setViewItems(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function handleSaveViewChanges() {
+    if (!viewTarget) return
+    const updatedItems = viewItems.map(item => ({ ...item, subtotal: (item.unitPrice || 0) * item.qty }))
+    const updatedTotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0)
+    setViewTarget(prev => prev ? { ...prev, items: updatedItems, total: updatedTotal } : prev)
+    setIsEditingView(false)
+
+    if (onEdit) {
+      const result = onEdit({ ...viewTarget, items: updatedItems, total: updatedTotal })
+      if (result && typeof result.then === 'function') {
+        result.catch(err => setError(err instanceof Error ? err.message : 'Failed to update sale'))
+      }
+    }
+  }
+
+  function handleCancelViewEdit() {
+    if (!viewTarget) return
+    setViewItems(viewTarget.items.map(item => ({ ...item })))
+    setIsEditingView(false)
   }
 
   function formatCurrency(n) {
@@ -338,7 +376,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
             </p>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
               <button
-                onClick={() => setViewTarget(sale)}
+                onClick={() => openViewSale(sale)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
               >
                 <Eye size={13} /> View
@@ -393,7 +431,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <button
-                      onClick={() => setViewTarget(sale)}
+                      onClick={() => openViewSale(sale)}
                       className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
                       title="View"
                     >
@@ -561,11 +599,40 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
 
       {/* View Sale */}
       {viewTarget && (
-        <Modal title="Sale Details" onClose={() => setViewTarget(null)}>
+        <Modal title="Sale Details" onClose={() => { setViewTarget(null); setIsEditingView(false) }}>
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Clock size={14} className="text-slate-400 shrink-0" />
-              <span>{formatDate(viewTarget.date)}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <Clock size={14} className="text-slate-400 shrink-0" />
+                <span>{formatDate(viewTarget.date)}</span>
+              </div>
+              {isOwner && (
+                <div className="flex flex-wrap gap-2">
+                  {isEditingView ? (
+                    <>
+                      <button
+                        onClick={handleSaveViewChanges}
+                        className="px-3 py-2 text-xs font-medium bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={handleCancelViewEdit}
+                        className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditingView(true)}
+                      className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="text-sm text-slate-600">
               <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
@@ -573,16 +640,49 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                {viewTarget.items.map((item, idx) => {
+                {viewItems.map((item, idx) => {
                   const price = item.unitPrice || 0
                   return (
                     <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2">
-                      <div className="flex-1 min-w-0 truncate">
-                        <span className="text-sm text-slate-800">{item.productName}</span>
-                        <span className="text-xs text-slate-400 ml-2">x{item.qty}</span>
-                        <span className="text-xs text-slate-400 ml-2">@ {formatCurrency(price)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-slate-800 truncate">{item.productName}</span>
+                          <span className="text-xs text-slate-400">@ {formatCurrency(price)}</span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+                          {isEditingView ? (
+                            <>
+                              <button
+                                onClick={() => updateViewItemQty(idx, item.qty - 1)}
+                                className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                              >
+                                -
+                              </button>
+                              <span className="font-medium text-slate-900">{item.qty}</span>
+                              <button
+                                onClick={() => updateViewItemQty(idx, item.qty + 1)}
+                                className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
+                              >
+                                +
+                              </button>
+                            </>
+                          ) : (
+                            <span>x{item.qty}</span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
+                        {isEditingView && (
+                          <button
+                            onClick={() => removeViewItem(idx)}
+                            className="text-slate-400 hover:text-rose-500 transition-colors"
+                            aria-label={`Remove ${item.productName}`}
+                          >
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -590,7 +690,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
             </div>
             <div className="flex justify-between items-center pt-3 border-t border-slate-200">
               <span className="text-sm font-medium text-slate-700">Total</span>
-              <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(viewTarget.total)}</span>
+              <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(viewItems.reduce((sum, item) => sum + ((item.unitPrice || 0) * item.qty), 0))}</span>
             </div>
           </div>
         </Modal>
