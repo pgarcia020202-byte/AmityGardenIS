@@ -264,6 +264,10 @@ export default function App() {
         refreshStockLogs()
       }
     })
+    socket.on('stockLog:deleted', (id) => {
+      const normalizedId = normalizeId(id)
+      setStockLogs((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
+    })
 
     socket.on('user:updated', (user) => {
       const id = normalizeId(user.id)
