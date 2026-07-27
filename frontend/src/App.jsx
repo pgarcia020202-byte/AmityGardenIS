@@ -9,6 +9,7 @@ import StockLogsPage from './pages/StockLogsPage'
 import ReportsPage from './pages/ReportsPage'
 import UsersPage from './pages/UsersPage'
 import {
+  authAPI,
   categoryAPI,
   productAPI,
   salesAPI,
@@ -49,50 +50,87 @@ export default function App() {
 
   useEffect(() => {
     async function loadData() {
-      if (!currentUser) return
-      
-      // Check if token exists before loading data
+      if (!currentUser) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+
+      // Verify token before loading any data
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          console.warn('No token found, logging out')
-          handleLogout()
-          setLoading(false)
-          return
-        }
+        await authAPI.verifyToken()
       } catch (error) {
-        console.error('Error checking token:', error)
+        console.error('Token verification failed:', error)
         handleLogout()
         setLoading(false)
         return
       }
-      
-      try {
-        const [categoriesData, productsData, salesData, stockLogsData] = await Promise.all([
-          categoryAPI.getAll(),
-          productAPI.getAll(),
-          salesAPI.getAll(),
-          stockLogsAPI.getAll(),
-        ])
-        setCategories(categoriesData)
-        setProducts(productsData)
-        setSales(salesData)
-        setStockLogs(stockLogsData)
-        
-        // Only fetch users if admin
-        if (currentUser.role === 'admin') {
+
+      const results = await Promise.allSettled([
+        categoryAPI.getAll(),
+        productAPI.getAll(),
+        salesAPI.getAll(),
+        stockLogsAPI.getAll()
+      ])
+
+      const [categoriesResult, productsResult, salesResult, logsResult] = results
+
+      const handleRejected = (result, name) => {
+        if (!result || result.status !== 'rejected') return
+        const error = result.reason
+        console.error(`Error loading ${name}:`, error)
+        if (error?.message?.includes('Unauthorized') || error?.message?.includes('Invalid token') || error?.message?.includes('Authentication error') || error?.message?.includes('401') || error?.message?.includes('403')) {
+          console.warn('Auth error detected while loading data, clearing session')
+          handleLogout()
+          return true
+        }
+        return false
+      }
+
+      if (categoriesResult.status === 'fulfilled') {
+        setCategories(categoriesResult.value)
+      } else if (handleRejected(categoriesResult, 'categories')) {
+        setLoading(false)
+        return
+      }
+
+      if (productsResult.status === 'fulfilled') {
+        setProducts(productsResult.value)
+      } else if (handleRejected(productsResult, 'products')) {
+        setLoading(false)
+        return
+      }
+
+      if (salesResult.status === 'fulfilled') {
+        setSales(salesResult.value)
+      } else if (handleRejected(salesResult, 'sales')) {
+        setLoading(false)
+        return
+      }
+
+      if (logsResult.status === 'fulfilled') {
+        setStockLogs(logsResult.value)
+      } else if (handleRejected(logsResult, 'stock logs')) {
+        setLoading(false)
+        return
+      }
+
+      if (currentUser.role === 'admin') {
+        try {
           const usersData = await usersAPI.getAll()
           setUsers(usersData)
-        } else {
-          setUsers([])
+        } catch (error) {
+          console.error('Error loading users:', error)
+          if (error?.message?.includes('Unauthorized') || error?.message?.includes('Invalid token') || error?.message?.includes('Authentication error') || error?.message?.includes('401') || error?.message?.includes('403')) {
+            console.warn('Auth error detected while loading users, clearing session')
+            handleLogout()
+            setLoading(false)
+            return
+          }
         }
-      } catch (error) {
-        console.error('Error loading data:', error)
-        // If it's an auth error, clear the session
-        if (error.message?.includes('Unauthorized') || error.message?.includes('Invalid token') || error.message?.includes('401')) {
-          console.warn('Auth error detected, clearing session')
-          handleLogout()
-        }
+      } else {
+        setUsers([])
       }
 
       setLoading(false)
@@ -125,6 +163,20 @@ export default function App() {
   function handleNavigate(page) {
     setCurrentPage(page)
     localStorage.setItem('currentPage', page)
+  }
+
+  if (currentUser && loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+        <div className="text-center space-y-3">
+          <div className="mx-auto h-16 w-16 rounded-full border-4 border-yellow-500 border-t-transparent animate-spin" />
+          <div>
+            <p className="text-lg font-semibold">Restoring session…</p>
+            <p className="text-sm text-slate-300">Verifying your account and loading data.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   async function handleAddCategory(name) {

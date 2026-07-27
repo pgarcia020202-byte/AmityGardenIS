@@ -15,9 +15,9 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  // Add timeout for mobile networks
+  // Add timeout for mobile networks and slower render cold starts
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 25000) // 25 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -29,8 +29,21 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'API request failed')
+      let errorBody = null
+      try {
+        errorBody = await response.json()
+      } catch (parseError) {
+        console.warn('Failed to parse error response:', parseError)
+      }
+
+      const message = errorBody?.error || response.statusText || 'API request failed'
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Authentication error: ${message}`)
+      }
+      if (response.status >= 500) {
+        throw new Error(`Server error: ${message}`)
+      }
+      throw new Error(message)
     }
 
     if (response.status === 204) {
@@ -40,14 +53,25 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
     return response.json()
   } catch (error) {
     clearTimeout(timeoutId)
-    
-    // Retry on network errors (up to 2 retries for mobile instability)
-    if (retryCount < 2 && (error.name === 'AbortError' || error.message?.includes('fetch') || error.message?.includes('network'))) {
-      console.warn(`Retrying API call (${retryCount + 1}/2):`, endpoint)
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
+
+    const errorMessage = error?.message || String(error)
+    const shouldRetry = retryCount < 3 && (
+      error.name === 'AbortError' ||
+      errorMessage.includes('Failed to fetch') ||
+      errorMessage.includes('NetworkError') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('Server error') ||
+      errorMessage.includes('502') ||
+      errorMessage.includes('503') ||
+      errorMessage.includes('504')
+    )
+
+    if (shouldRetry) {
+      console.warn(`Retrying API call (${retryCount + 1}/3):`, endpoint, errorMessage)
+      await new Promise((resolve) => setTimeout(resolve, 1200))
       return apiCall(endpoint, options, retryCount + 1)
     }
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Connection timeout. Please check your internet and try again.')
     }
