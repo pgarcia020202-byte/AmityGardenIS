@@ -188,12 +188,6 @@ export default function App() {
       }
     }
 
-    socket.on('category:created', (category) => {
-      setCategories((prev) => {
-        const id = normalizeId(category.id)
-        return prev.some((item) => normalizeId(item.id) === id) ? prev : [...prev, category]
-      })
-    })
     socket.on('category:updated', (category) => {
       const id = normalizeId(category.id)
       setCategories((prev) => prev.map((item) => (normalizeId(item.id) === id ? category : item)))
@@ -263,10 +257,6 @@ export default function App() {
       }
     })
 
-    socket.on('user:created', (user) => {
-      const id = normalizeId(user.id)
-      setUsers((prev) => (prev.some((item) => normalizeId(item.id) === id) ? prev : [...prev, user]))
-    })
     socket.on('user:updated', (user) => {
       const id = normalizeId(user.id)
       setUsers((prev) => prev.map((item) => (normalizeId(item.id) === id ? user : item)))
@@ -387,28 +377,53 @@ export default function App() {
     setStockLogs(logsData)
   }
 
-  async function handleEditSale(updatedSale) {
-    const id = normalizeId(updatedSale.id)
-    setSales((prev) => prev.map((entry) => (normalizeId(entry.id) === id ? updatedSale : entry)))
-
-    // Reload products and stock logs because editing a sale may affect inventory and logs
-    try {
-      const [productsData, logsData] = await Promise.all([
-        productAPI.getAll(),
-        stockLogsAPI.getAll()
-      ])
-      setProducts(productsData)
-      setStockLogs(logsData)
-    } catch (err) {
-      console.error('Failed to refresh products or stock logs after editing sale:', err)
-    }
-  }
-
   async function handleDeleteSale(id) {
     await salesAPI.delete(id)
     setSales((prev) => prev.filter((entry) => entry.id !== id))
     
     // Reload products and stock logs as they are updated automatically
+    const [productsData, logsData] = await Promise.all([
+      productAPI.getAll(),
+      stockLogsAPI.getAll()
+    ])
+    setProducts(productsData)
+    setStockLogs(logsData)
+  }
+
+  async function handleDeleteStockLog(id) {
+    try {
+      await stockLogsAPI.delete(id)
+      setStockLogs((prev) => prev.filter((log) => normalizeId(log.id) !== normalizeId(id)))
+    } catch (err) {
+      throw err
+    }
+  }
+
+  // Edit/update an existing sale (admin only)
+  async function handleEditSale(id, updatedSale) {
+    try {
+      const updated = await salesAPI.update(id, updatedSale)
+      // Update local state with returned sale if available, otherwise optimistically apply changes
+      if (updated && updated.id) {
+        setSales((prev) => prev.map((s) => (normalizeId(s.id) === normalizeId(updated.id) ? updated : s)))
+      } else {
+        setSales((prev) => prev.map((s) => (normalizeId(s.id) === normalizeId(id) ? { ...s, ...updatedSale } : s)))
+      }
+
+      // refresh full sales list to avoid race conditions with realtime events
+      try {
+        const allSales = await salesAPI.getAll()
+        setSales(allSales)
+      } catch (e) {
+        // If fetching all sales fails, continue — we already updated optimistically above
+        console.warn('Failed to refresh full sales list after update:', e)
+      }
+
+    } catch (err) {
+      throw err
+    }
+
+    // Reload products and stock logs as they may have been adjusted by the backend
     const [productsData, logsData] = await Promise.all([
       productAPI.getAll(),
       stockLogsAPI.getAll()
@@ -445,9 +460,9 @@ export default function App() {
       case 'products':
         return <ProductsPage products={products} categories={categories} currentUser={currentUser} onAdd={handleAddProduct} onEdit={handleEditProduct} onDelete={handleDeleteProduct} />
       case 'sales':
-        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} onEdit={handleEditSale} />
+        return <SalesPage sales={sales} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddSale} onEdit={handleEditSale} onDelete={handleDeleteSale} />
       case 'stock-logs':
-        return <StockLogsPage stockLogs={stockLogs} />
+        return <StockLogsPage stockLogs={stockLogs} currentUser={currentUser} onDelete={handleDeleteStockLog} />
       case 'reports':
         return <ReportsPage products={products} sales={sales} categories={categories} />
       case 'users':

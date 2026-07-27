@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
     qty INTEGER NOT NULL CHECK (qty > 0),
     unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price > 0),
     subtotal DECIMAL(10, 2) NOT NULL CHECK (subtotal >= 0),
+    stock_log_id UUID REFERENCES stock_logs(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

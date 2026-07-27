@@ -1,14 +1,51 @@
 import { useState, useEffect } from 'react'
-import { Search, Archive, Clock, Download } from 'lucide-react'
+import { Search, Archive, Clock, Download, Trash2, AlertCircle } from 'lucide-react'
 import jsPDF from 'jspdf'
 
-export default function StockLogs({ stockLogs }) {
+function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm, onCancel, loading }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+              <AlertCircle size={20} className="text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          </div>
+          <p className="text-sm text-slate-600 mb-6">{message}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              disabled={loading}
+              className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200"
+            >
+              {cancelText || 'Cancel'}
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              {loading ? 'Processing…' : confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function StockLogs({ stockLogs, currentUser, onDelete }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingLogId, setDeletingLogId] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const filtered = stockLogs.filter(log => {
     const matchesSearch =
@@ -46,6 +83,29 @@ export default function StockLogs({ stockLogs }) {
     const h = Math.floor(m / 60)
     if (h < 24) return `${h}h ago`
     return `${Math.floor(h / 24)}d ago`
+  }
+
+  function handleDeleteClick(logId) {
+    setDeletingLogId(logId)
+    setShowDeleteConfirm(true)
+  }
+
+  async function handleDeleteConfirm() {
+    setDeleting(true)
+    try {
+      await onDelete(deletingLogId)
+      setShowDeleteConfirm(false)
+      setDeletingLogId(null)
+    } catch (error) {
+      console.error('Failed to delete stock log:', error)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function handleDeleteCancel() {
+    setShowDeleteConfirm(false)
+    setDeletingLogId(null)
   }
 
   function handleExportPDF() {
@@ -302,12 +362,15 @@ export default function StockLogs({ stockLogs }) {
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Change</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Stock</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">User</th>
+                {currentUser?.role === 'admin' && (
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={currentUser?.role === 'admin' ? 8 : 7} className="px-5 py-12 text-center text-sm text-slate-400">
                     {search || typeFilter !== 'all' ? 'No logs match your filters.' : 'No stock activity yet.'}
                   </td>
                 </tr>
@@ -362,6 +425,17 @@ export default function StockLogs({ stockLogs }) {
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-sm text-slate-600">{log.user_name}</td>
+                  {currentUser?.role === 'admin' && (
+                    <td className="px-5 py-3.5">
+                      <button
+                        onClick={() => handleDeleteClick(log.id)}
+                        className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors"
+                        title="Delete log"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -395,6 +469,19 @@ export default function StockLogs({ stockLogs }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <ConfirmationModal
+          title="Confirm Delete"
+          message="This will permanently delete this stock log and cannot be undone."
+          confirmText="Delete Log"
+          cancelText="Cancel"
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          loading={deleting}
+        />
       )}
     </div>
   )

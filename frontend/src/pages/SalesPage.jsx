@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react'
 import { Plus, Search, Clock, X, Check, AlertCircle, Eye, Download } from 'lucide-react'
 import jsPDF from 'jspdf'
 
+function formatCurrency(n) {
+  return '₱' + parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -16,12 +30,280 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-export default function Sales({ sales, products, categories, currentUser, onAdd, onEdit }) {
+function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm, onCancel, loading }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+              <AlertCircle size={20} className="text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          </div>
+          <p className="text-sm text-slate-600 mb-6">{message}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              disabled={loading}
+              className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200"
+            >
+              {cancelText || 'Cancel'}
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-lg text-sm font-medium transition-all duration-200"
+            >
+              {loading ? 'Processing…' : confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Sale details / admin edit modal. Kept as a standalone component (not nested
+// inside Sales) so React preserves its identity across Sales re-renders —
+// previously this was defined inline inside Sales, which meant every re-render
+// (e.g. from a socket update touching products/sales) redefined the function
+// and made React unmount+remount the modal, silently wiping out any qty edits
+// the admin was mid-way through.
+function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, onDelete }) {
+  // Keep originalQty so we can calculate how much more can be added on top of
+  // the quantity already reserved by this sale. product.current_stock is
+  // assumed to be the live stock (after the sale was created), so allowed max
+  // = current_stock + originalQty.
+  const [items, setItems] = useState(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [modalError, setModalError] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  useEffect(() => {
+    setItems(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+    setModalError('')
+  }, [viewTarget])
+
+  function getMaxStockForItem(item) {
+    const productMeta = products.find(p => p.id === item.productId)
+    if (!productMeta) return undefined
+    const orig = typeof item.originalQty === 'number' ? item.originalQty : item.qty
+    return productMeta.current_stock + orig
+  }
+
+  function updateQty(idx, qty, providedMax) {
+    qty = parseInt(qty, 10)
+    if (isNaN(qty) || qty < 1) qty = 1
+    const it = items[idx]
+    const maxStock = typeof providedMax === 'number' ? providedMax : (it ? getMaxStockForItem(it) : undefined)
+    if (typeof maxStock === 'number' && qty > maxStock) {
+      qty = maxStock
+      setModalError(`Only ${maxStock} units available for ${it.productName}`)
+    } else {
+      setModalError('')
+    }
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, qty } : it))
+  }
+
+  function removeItem(idx) {
+    setItems(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const total = items.reduce((sum, it) => sum + ((it.unitPrice || 0) * it.qty), 0)
+
+  const canEdit = currentUser?.role === 'admin'
+  const busy = saving || deleting
+
+  // Check if any items have changed from their original quantities
+  const hasChanges = items.some(item => {
+    const originalItem = viewTarget.items.find(orig => orig.productId === item.productId)
+    if (!originalItem) return true // New item added
+    return item.qty !== originalItem.qty || item.unitPrice !== originalItem.unitPrice
+  }) || items.length !== viewTarget.items.length // Check if items were removed
+
+  async function handleSaveClick() {
+    if (!hasChanges) {
+      setModalError('No changes to save')
+      return
+    }
+
+    if (items.length === 0) {
+      setModalError('A sale needs at least one item. Use "Delete Sale" to remove it entirely instead.')
+      return
+    }
+
+    // Validate stock availability before saving
+    for (const it of items) {
+      const productMeta = products.find(p => p.id === it.productId)
+      if (!productMeta) {
+        setModalError(`Product ${it.productName} is no longer available.`)
+        return
+      }
+      const maxStock = productMeta.current_stock + (typeof it.originalQty === 'number' ? it.originalQty : it.qty)
+      if (it.qty > maxStock) {
+        setModalError(`Not enough stock for ${it.productName}. Only ${maxStock} available.`)
+        return
+      }
+    }
+
+    setModalError('')
+    setSaving(true)
+    try {
+      await onSave(items)
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : 'Failed to save changes')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteClick() {
+    if (!onDelete) return
+    setShowDeleteConfirm(true)
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+      <div className="flex items-center gap-2 text-sm text-slate-600">
+        <Clock size={14} className="text-slate-400 shrink-0" />
+        <span>{formatDate(viewTarget.date)}</span>
+      </div>
+      <div className="text-sm text-slate-600">
+        <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
+        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+          {items.map((item, idx) => {
+            const price = item.unitPrice || 0
+            const productMeta = products.find(p => p.id === item.productId)
+            const maxStock = productMeta ? (productMeta.current_stock + (typeof item.originalQty === 'number' ? item.originalQty : item.qty)) : undefined
+            return (
+              <div key={item.productId || idx} className="flex items:center justify-between gap-2 px-3 py-2">
+                <div className="flex-1 min-w-0 truncate">
+                  <span className="text-sm text-slate-800">{item.productName}</span>
+                  <span className="text-xs text-slate-400 ml-2">@ {formatCurrency(price)}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {canEdit ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => updateQty(idx, item.qty - 1, maxStock)}
+                        disabled={busy}
+                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
+                      >-
+                      </button>
+                      <input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) => updateQty(idx, e.target.value, maxStock)}
+                        min={1}
+                        max={maxStock}
+                        disabled={busy}
+                        className="w-16 text-center border border-slate-200 rounded px-2 py-1 text-sm disabled:opacity-50"
+                      />
+                      <button
+                        onClick={() => updateQty(idx, item.qty + 1, maxStock)}
+                        disabled={busy || (typeof maxStock === 'number' && item.qty >= maxStock)}
+                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
+                      >+
+                      </button>
+                      <button
+                        onClick={() => removeItem(idx)}
+                        disabled={busy}
+                        title="Remove item"
+                        className="ml-2 text-slate-400 hover:text-rose-500 disabled:opacity-50"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 ml-2">x{item.qty}</span>
+                  )}
+                </div>
+
+                <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
+              </div>
+            )
+          })}
+          {items.length === 0 && (
+            <div className="px-3 py-4 text-sm text-slate-400 text-center">No items in this sale.</div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+        <span className="text-sm font-medium text-slate-700">Total</span>
+        <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(total)}</span>
+      </div>
+
+      {modalError && (
+        <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{modalError}</p>
+      )}
+
+
+      <div className="flex flex-col gap-2 pt-1">
+        <div className="flex gap-3">
+          <button onClick={onClose} disabled={busy} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all duration-200">Close</button>
+          {canEdit && (
+            <button
+              onClick={handleSaveClick}
+              disabled={busy || !hasChanges}
+              className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-black font-medium flex items-center justify-center gap-2 transition-all duration-200"
+            >
+              <Check size={15} /> {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          )}
+        </div>
+        {canEdit && onDelete && (
+          <button
+            onClick={handleDeleteClick}
+            disabled={busy}
+            className="w-full py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
+          >
+            <X size={15} /> {deleting ? 'Deleting…' : 'Delete Sale'}
+          </button>
+        )}
+      </div>
+    </div>
+
+    {/* Delete Confirmation Modal */}
+    {showDeleteConfirm && (
+      <ConfirmationModal
+        title="Confirm Delete"
+        message="This will permanently delete the sale and cannot be undone."
+        confirmText="Delete Sale"
+        cancelText="Cancel"
+        loading={deleting}
+        onConfirm={async () => {
+          setModalError('')
+          setDeleting(true)
+          try {
+            await onDelete(viewTarget.id)
+            setShowDeleteConfirm(false)
+            onClose()
+          } catch (err) {
+            setModalError(err instanceof Error ? err.message : 'Failed to delete sale')
+            setDeleting(false)
+            setShowDeleteConfirm(false)
+          }
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+    )}
+
+    </>
+  )
+}
+
+export default function Sales({ sales, products, categories, currentUser, onAdd, onEdit, onDelete, onForceEdit }) {
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
-  const [viewItems, setViewItems] = useState([])
-  const [isEditingView, setIsEditingView] = useState(false)
   const [cart, setCart] = useState([])
   const [error, setError] = useState('')
   const [productSearch, setProductSearch] = useState('')
@@ -31,7 +313,6 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
-  const isOwner = currentUser?.role === 'admin' || currentUser?.role === 'owner'
 
   const filtered = sales.filter(s => {
     const matchesSearch =
@@ -121,55 +402,6 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
 
   function removeFromCart(productId) {
     setCart(cart.filter(c => c.productId !== productId))
-  }
-
-  function openViewSale(sale) {
-    setViewTarget(sale)
-    setViewItems(sale.items.map(item => ({ ...item })))
-    setIsEditingView(false)
-  }
-
-  function updateViewItemQty(index, qty) {
-    setViewItems(prev => prev.map((item, i) => i === index ? { ...item, qty: Math.max(1, qty) } : item))
-  }
-
-  function removeViewItem(index) {
-    setViewItems(prev => prev.filter((_, i) => i !== index))
-  }
-
-  function handleSaveViewChanges() {
-    if (!viewTarget) return
-    const updatedItems = viewItems.map(item => ({ ...item, subtotal: (item.unitPrice || 0) * item.qty }))
-    const updatedTotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0)
-    setViewTarget(prev => prev ? { ...prev, items: updatedItems, total: updatedTotal } : prev)
-    setIsEditingView(false)
-
-    if (onEdit) {
-      const result = onEdit({ ...viewTarget, items: updatedItems, total: updatedTotal })
-      if (result && typeof result.then === 'function') {
-        result.catch(err => setError(err instanceof Error ? err.message : 'Failed to update sale'))
-      }
-    }
-  }
-
-  function handleCancelViewEdit() {
-    if (!viewTarget) return
-    setViewItems(viewTarget.items.map(item => ({ ...item })))
-    setIsEditingView(false)
-  }
-
-  function formatCurrency(n) {
-    return '₱' + parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
-  }
-
-  function formatDate(iso) {
-    return new Date(iso).toLocaleString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
   }
 
   function handleExportPDF() {
@@ -376,7 +608,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
             </p>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
               <button
-                onClick={() => openViewSale(sale)}
+                onClick={() => setViewTarget(sale)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
               >
                 <Eye size={13} /> View
@@ -431,7 +663,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <button
-                      onClick={() => openViewSale(sale)}
+                      onClick={() => setViewTarget(sale)}
                       className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
                       title="View"
                     >
@@ -599,100 +831,33 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
 
       {/* View Sale */}
       {viewTarget && (
-        <Modal title="Sale Details" onClose={() => { setViewTarget(null); setIsEditingView(false) }}>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Clock size={14} className="text-slate-400 shrink-0" />
-                <span>{formatDate(viewTarget.date)}</span>
-              </div>
-              {isOwner && (
-                <div className="flex flex-wrap gap-2">
-                  {isEditingView ? (
-                    <>
-                      <button
-                        onClick={handleSaveViewChanges}
-                        className="px-3 py-2 text-xs font-medium bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelViewEdit}
-                        className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setIsEditingView(true)}
-                      className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="text-sm text-slate-600">
-              <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
-              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-                {viewItems.map((item, idx) => {
-                  const price = item.unitPrice || 0
-                  return (
-                    <div key={idx} className="flex items-center justify-between gap-2 px-3 py-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm text-slate-800 truncate">{item.productName}</span>
-                          <span className="text-xs text-slate-400">@ {formatCurrency(price)}</span>
-                        </div>
-                        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                          {isEditingView ? (
-                            <>
-                              <button
-                                onClick={() => updateViewItemQty(idx, item.qty - 1)}
-                                className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
-                              >
-                                -
-                              </button>
-                              <span className="font-medium text-slate-900">{item.qty}</span>
-                              <button
-                                onClick={() => updateViewItemQty(idx, item.qty + 1)}
-                                className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700"
-                              >
-                                +
-                              </button>
-                            </>
-                          ) : (
-                            <span>x{item.qty}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
-                        {isEditingView && (
-                          <button
-                            onClick={() => removeViewItem(idx)}
-                            className="text-slate-400 hover:text-rose-500 transition-colors"
-                            aria-label={`Remove ${item.productName}`}
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="flex justify-between items-center pt-3 border-t border-slate-200">
-              <span className="text-sm font-medium text-slate-700">Total</span>
-              <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(viewItems.reduce((sum, item) => sum + ((item.unitPrice || 0) * item.qty), 0))}</span>
-            </div>
-          </div>
+        <Modal title="Sale Details" onClose={() => setViewTarget(null)}>
+          <SaleDetailsModal
+            viewTarget={viewTarget}
+            products={products}
+            currentUser={currentUser}
+            onClose={() => setViewTarget(null)}
+            onSave={async (updatedItems) => {
+              // Calculate new total
+              const newTotal = updatedItems.reduce((sum, it) => sum + ((it.unitPrice || 0) * it.qty), 0)
+              // Call parent handler if provided
+              if (onEdit) {
+                // Let errors propagate — the modal shows them inline and keeps
+                // the admin's edits on screen instead of silently discarding them.
+                await onEdit(viewTarget.id, { ...viewTarget, items: updatedItems, total: newTotal })
+                // Update local viewTarget for immediate feedback
+                setViewTarget(prev => ({ ...prev, items: updatedItems, total: newTotal }))
+                // On successful save, close the modal automatically
+                setViewTarget(null)
+              } else {
+                // No parent handler: optimistically update local viewTarget
+                setViewTarget(prev => ({ ...prev, items: updatedItems, total: newTotal }))
+                // Close modal since there is no parent to persist changes
+                setViewTarget(null)
+              }
+            }}
+            onDelete={onDelete}
+          />
         </Modal>
       )}
     </div>

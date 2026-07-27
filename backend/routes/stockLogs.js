@@ -73,4 +73,28 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// Delete stock log (admin only)
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM stock_logs WHERE id = $1 RETURNING id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Stock log not found' });
+    }
+
+    const io = req.app.get('io');
+    io.emit('stockLog:deleted', id);
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Delete stock log error:', error);
+    res.status(500).json({ error: 'Failed to delete stock log' });
+  }
+});
+
 export default router;

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://amitygardenis.onrender.com/api'
+﻿const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://amitygardenis.onrender.com/api'
 
 // Get stored token
 const getToken = () => localStorage.getItem('token')
@@ -167,11 +167,14 @@ export const salesAPI = {
     })
   },
 
-  delete: async (id) => {
+  update: async (id, saleData) => {
     return apiCall(`/sales/${id}`, {
-      method: 'DELETE'
+      method: 'PUT',
+      body: JSON.stringify(saleData)
     })
   },
+
+  delete: async (id) => {
     return apiCall(`/sales/${id}`, {
       method: 'DELETE'
     })
@@ -188,6 +191,12 @@ export const stockLogsAPI = {
     return apiCall('/stock-logs', {
       method: 'POST',
       body: JSON.stringify(logData)
+    })
+  },
+
+  delete: async (id) => {
+    return apiCall(`/stock-logs/${id}`, {
+      method: 'DELETE'
     })
   }
 }
