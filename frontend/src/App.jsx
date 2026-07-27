@@ -234,6 +234,14 @@ export default function App() {
         refreshStockLogs()
       }
     })
+    socket.on('sale:updated', (sale) => {
+      const id = normalizeId(sale.id)
+      setSales((prev) => prev.map((item) => (normalizeId(item.id) === id ? sale : item)))
+      refreshProductsAndStockLogs()
+      if (currentPageRef.current === 'stock-logs') {
+        refreshStockLogs()
+      }
+    })
     socket.on('sale:deleted', (saleId) => {
       const normalizedId = normalizeId(saleId)
       setSales((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
