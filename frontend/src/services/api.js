@@ -3,8 +3,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://amitygardenis.onre
 // Get stored token
 const getToken = () => localStorage.getItem('token')
 
-// Generic API call function
-async function apiCall(endpoint, options = {}) {
+// Generic API call function with retry logic
+async function apiCall(endpoint, options = {}, retryCount = 0) {
   const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
@@ -17,7 +17,7 @@ async function apiCall(endpoint, options = {}) {
 
   // Add timeout for mobile networks
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 20000) // 20 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 25000) // 25 second timeout
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -40,6 +40,14 @@ async function apiCall(endpoint, options = {}) {
     return response.json()
   } catch (error) {
     clearTimeout(timeoutId)
+    
+    // Retry on network errors (up to 2 retries for mobile instability)
+    if (retryCount < 2 && (error.name === 'AbortError' || error.message?.includes('fetch') || error.message?.includes('network'))) {
+      console.warn(`Retrying API call (${retryCount + 1}/2):`, endpoint)
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
+      return apiCall(endpoint, options, retryCount + 1)
+    }
+    
     if (error.name === 'AbortError') {
       throw new Error('Connection timeout. Please check your internet and try again.')
     }

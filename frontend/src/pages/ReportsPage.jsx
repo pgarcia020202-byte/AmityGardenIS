@@ -12,8 +12,13 @@ function getRangeDays(range) {
   return 7
 }
 
+function toPhilippinesTime(date) {
+  const phOffset = 8 * 60 * 60 * 1000 // UTC+8
+  return new Date(date.getTime() + phOffset)
+}
+
 function getRangeStart(range) {
-  const now = new Date()
+  const now = toPhilippinesTime(new Date())
   now.setHours(0, 0, 0, 0)
   
   if (range === 'today') {
@@ -54,7 +59,7 @@ function getRangeStart(range) {
 }
 
 function getRangeEnd(range) {
-  const now = new Date()
+  const now = toPhilippinesTime(new Date())
   now.setHours(23, 59, 59, 999)
   
   if (range === 'yesterday') {
@@ -103,7 +108,7 @@ export default function Reports({ products, sales, categories }) {
     const start = getRangeStart(timeRange)
     const end = getRangeEnd(timeRange)
     return sales.filter(s => {
-      const saleDate = new Date(s.date)
+      const saleDate = toPhilippinesTime(new Date(s.date))
       return saleDate >= start && saleDate <= end
     })
   }, [sales, timeRange])
@@ -145,7 +150,7 @@ export default function Reports({ products, sales, categories }) {
   const salesOverTime = useMemo(() => {
     // Hourly data for today and yesterday
     if (timeRange === 'today' || timeRange === 'yesterday') {
-      const baseDate = timeRange === 'today' ? new Date() : new Date(new Date().setDate(new Date().getDate() - 1))
+      const baseDate = timeRange === 'today' ? toPhilippinesTime(new Date()) : toPhilippinesTime(new Date(new Date().setDate(new Date().getDate() - 1)))
       baseDate.setHours(0, 0, 0, 0)
       
       return Array.from({ length: 24 }, (_, i) => {
@@ -155,7 +160,7 @@ export default function Reports({ products, sales, categories }) {
         hourEnd.setHours(i + 1, 0, 0, 0)
 
         const hourSales = filteredSales.filter(s => {
-          const saleDate = new Date(s.date)
+          const saleDate = toPhilippinesTime(new Date(s.date))
           return saleDate >= hourStart && saleDate < hourEnd
         })
 
@@ -183,7 +188,7 @@ export default function Reports({ products, sales, categories }) {
         if (currentWeekEnd > end) currentWeekEnd.setTime(end.getTime())
         
         const weekSales = filteredSales.filter(s => {
-          const saleDate = new Date(s.date)
+          const saleDate = toPhilippinesTime(new Date(s.date))
           return saleDate >= currentWeekStart && saleDate < currentWeekEnd
         })
         
@@ -202,7 +207,7 @@ export default function Reports({ products, sales, categories }) {
     // Monthly data for this year
     if (timeRange === 'thisYear') {
       const months = []
-      const currentYear = new Date().getFullYear()
+      const currentYear = toPhilippinesTime(new Date()).getFullYear()
       
       for (let month = 0; month < 12; month++) {
         const monthStart = new Date(currentYear, month, 1)
@@ -210,7 +215,7 @@ export default function Reports({ products, sales, categories }) {
         monthEnd.setHours(23, 59, 59, 999)
         
         const monthSales = filteredSales.filter(s => {
-          const saleDate = new Date(s.date)
+          const saleDate = toPhilippinesTime(new Date(s.date))
           return saleDate >= monthStart && saleDate <= monthEnd
         })
         
@@ -241,7 +246,7 @@ export default function Reports({ products, sales, categories }) {
       nextDay.setDate(nextDay.getDate() + 1)
 
       const daySales = filteredSales.filter(s => {
-        const saleDate = new Date(s.date)
+        const saleDate = toPhilippinesTime(new Date(s.date))
         return saleDate >= date && saleDate < nextDay
       })
 

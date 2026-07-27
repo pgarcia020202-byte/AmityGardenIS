@@ -16,6 +16,15 @@ export default function Login({ onLogin }) {
     setLoading(true)
 
     try {
+      // Clear any stale session data before login
+      try {
+        localStorage.removeItem('currentUser')
+        localStorage.removeItem('currentPage')
+        localStorage.removeItem('token')
+      } catch (clearError) {
+        console.error('Error clearing stale data:', clearError)
+      }
+
       const response = await authAPI.login(username, password)
       
       // Handle localStorage errors on mobile

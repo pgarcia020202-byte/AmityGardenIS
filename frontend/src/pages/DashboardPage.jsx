@@ -47,7 +47,11 @@ export default function Dashboard({ categories, products, sales, stockLogs, onNa
   const todaySales = sales.filter(s => {
     const d = new Date(s.date)
     const now = new Date()
-    return d.toDateString() === now.toDateString()
+    // Convert to Philippines timezone (Asia/Manila, UTC+8)
+    const phOffset = 8 * 60 * 60 * 1000 // 8 hours in milliseconds
+    const dPH = new Date(d.getTime() + phOffset)
+    const nowPH = new Date(now.getTime() + phOffset)
+    return dPH.toDateString() === nowPH.toDateString()
   })
   const todayRevenue = todaySales.reduce((s, sale) => s + parseFloat(sale.total || 0), 0)
 

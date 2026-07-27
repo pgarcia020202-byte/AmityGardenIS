@@ -18,12 +18,27 @@ import {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
-    const savedUser = localStorage.getItem('currentUser')
-    return savedUser ? JSON.parse(savedUser) : null
+    try {
+      const savedUser = localStorage.getItem('currentUser')
+      const savedToken = localStorage.getItem('token')
+      // Only restore user if both user and token exist
+      if (savedUser && savedToken) {
+        return JSON.parse(savedUser)
+      }
+      return null
+    } catch (error) {
+      console.error('Error reading localStorage on init:', error)
+      return null
+    }
   })
   const [currentPage, setCurrentPage] = useState(() => {
-    const savedPage = localStorage.getItem('currentPage')
-    return savedPage || 'dashboard'
+    try {
+      const savedPage = localStorage.getItem('currentPage')
+      return savedPage || 'dashboard'
+    } catch (error) {
+      console.error('Error reading currentPage from localStorage:', error)
+      return 'dashboard'
+    }
   })
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
@@ -35,6 +50,22 @@ export default function App() {
   useEffect(() => {
     async function loadData() {
       if (!currentUser) return
+      
+      // Check if token exists before loading data
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          console.warn('No token found, logging out')
+          handleLogout()
+          setLoading(false)
+          return
+        }
+      } catch (error) {
+        console.error('Error checking token:', error)
+        handleLogout()
+        setLoading(false)
+        return
+      }
       
       try {
         const [categoriesData, productsData, salesData, stockLogsData] = await Promise.all([
@@ -57,6 +88,11 @@ export default function App() {
         }
       } catch (error) {
         console.error('Error loading data:', error)
+        // If it's an auth error, clear the session
+        if (error.message?.includes('Unauthorized') || error.message?.includes('Invalid token') || error.message?.includes('401')) {
+          console.warn('Auth error detected, clearing session')
+          handleLogout()
+        }
       }
 
       setLoading(false)
@@ -75,9 +111,13 @@ export default function App() {
   }
 
   function handleLogout() {
-    localStorage.removeItem('currentUser')
-    localStorage.removeItem('currentPage')
-    localStorage.removeItem('token')
+    try {
+      localStorage.removeItem('currentUser')
+      localStorage.removeItem('currentPage')
+      localStorage.removeItem('token')
+    } catch (error) {
+      console.error('localStorage error during logout:', error)
+    }
     setCurrentUser(null)
     setCurrentPage('dashboard')
   }
