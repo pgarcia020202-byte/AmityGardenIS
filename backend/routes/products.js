@@ -68,11 +68,14 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
 
     // Create stock log if initial stock > 0
     if (stock > 0) {
-      await client.query(
+      const stockLogResult = await client.query(
         `INSERT INTO stock_logs (product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [product.id, product.name, 'Stock In', 0, stock, stock, req.user.id, req.user.name, 'Initial stock']
       );
+      const stockLog = stockLogResult.rows[0];
+      const io = req.app.get('io');
+      io.emit('stockLog:created', stockLog);
     }
 
     await client.query('COMMIT');
@@ -152,11 +155,14 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
       const qtyChanged = newStock - oldStock;
       const logType = qtyChanged > 0 ? 'Stock In' : 'Adjustment';
       
-      await client.query(
+      const stockLogResult = await client.query(
         `INSERT INTO stock_logs (product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [updatedProduct.id, updatedProduct.name, logType, oldStock, qtyChanged, newStock, req.user.id, req.user.name, 'Stock adjustment']
       );
+      const stockLog = stockLogResult.rows[0];
+      const io = req.app.get('io');
+      io.emit('stockLog:created', stockLog);
     }
 
     await client.query('COMMIT');

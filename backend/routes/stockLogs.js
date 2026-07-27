@@ -62,7 +62,11 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       [product_id, product.name, type, prevStock, qtyChanged, finalNewStock, req.user.id, req.user.name, remarks || null]
     );
 
-    res.status(201).json(result.rows[0]);
+    const newLog = result.rows[0];
+    const io = req.app.get('io');
+    io.emit('stockLog:created', newLog);
+
+    res.status(201).json(newLog);
   } catch (error) {
     console.error('Create stock log error:', error);
     res.status(500).json({ error: 'Failed to create stock log' });

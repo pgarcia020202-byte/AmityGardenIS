@@ -38,7 +38,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd 
     const matchesStartDate = !startDate || saleDate >= new Date(startDate).setHours(0, 0, 0, 0)
     const matchesEndDate = !endDate || saleDate <= new Date(endDate).setHours(23, 59, 59, 999)
     return matchesSearch && matchesStartDate && matchesEndDate
-  })
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)

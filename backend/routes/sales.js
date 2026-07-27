@@ -76,20 +76,25 @@ router.post('/', authenticate, async (req, res) => {
         [item.qty, item.qty, item.productId]
       );
 
-      // Get current product stock for log
+      // Get current product stock for log and emit updated product event
       const productResult = await client.query(
-        'SELECT current_stock FROM products WHERE id = $1',
+        'SELECT id, name, category_id, price, current_stock, min_stock, total_sold, created_at, updated_at FROM products WHERE id = $1',
         [item.productId]
       );
-      const newStock = productResult.rows[0].current_stock;
+      const updatedProduct = productResult.rows[0];
+      const newStock = updatedProduct.current_stock;
       const prevStock = newStock + item.qty;
 
+      const io = req.app.get('io');
+      io.emit('product:updated', updatedProduct);
+
       // Create stock log
-      await client.query(
+      const stockLogResult = await client.query(
         `INSERT INTO stock_logs (product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [item.productId, item.productName, 'Sale', prevStock, -item.qty, newStock, req.user.id, req.user.name, `Sale #${sale.id}`]
       );
+      io.emit('stockLog:created', stockLogResult.rows[0]);
     }
 
     await client.query('COMMIT');
@@ -160,27 +165,32 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
         [item.qty, item.qty, item.product_id]
       );
 
-      // Get current product stock for log
+      // Get current product stock for log and emit product update
       const productResult = await client.query(
-        'SELECT current_stock FROM products WHERE id = $1',
+        'SELECT id, name, category_id, price, current_stock, min_stock, total_sold, created_at, updated_at FROM products WHERE id = $1',
         [item.product_id]
       );
-      
+       
       // Skip if product no longer exists
       if (productResult.rows.length === 0) {
         console.warn(`Product ${item.product_id} not found, skipping stock log for sale ${id}`);
         continue;
       }
-      
-      const newStock = productResult.rows[0].current_stock;
+       
+      const updatedProduct = productResult.rows[0];
+      const newStock = updatedProduct.current_stock;
       const prevStock = newStock - item.qty;
 
+      const io = req.app.get('io');
+      io.emit('product:updated', updatedProduct);
+
       // Create stock log for reversal
-      await client.query(
+      const stockLogResult = await client.query(
         `INSERT INTO stock_logs (product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [item.product_id, item.product_name, 'Adjustment', prevStock, item.qty, newStock, req.user.id, req.user.name, `Sale reversal #${id}`]
       );
+      io.emit('stockLog:created', stockLogResult.rows[0]);
     }
 
     // Delete sale (cascade will delete sale items)

@@ -25,6 +25,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('new-old')
   const [addOpen, setAddOpen] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -42,6 +43,18 @@ export default function Products({ products, categories, currentUser, onAdd, onE
     const status = getProductStatus(p)
     const matchesStatus = statusFilter === 'all' || status === statusFilter
     return matchesSearch && matchesCategory && matchesStatus
+  }).sort((a, b) => {
+    switch(sortBy) {
+      case 'a-z':
+        return a.name.localeCompare(b.name)
+      case 'z-a':
+        return b.name.localeCompare(a.name)
+      case 'old-new':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'new-old':
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
   })
 
   async function handleAdd(e) {
@@ -180,6 +193,16 @@ export default function Products({ products, categories, currentUser, onAdd, onE
               <option value="Low Stock">Low Stock</option>
               <option value="Out of Stock">Out of Stock</option>
             </select>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            >
+              <option value="new-old">Newest First</option>
+              <option value="old-new">Oldest First</option>
+              <option value="a-z">A - Z</option>
+              <option value="z-a">Z - A</option>
+            </select>
           </div>
           {canManage && (
             <button
@@ -203,7 +226,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
           const status = getProductStatus(p)
           const category = categories.find(c => c.id === p.category_id)
           return (
-            <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-4">
+            <div key={String(p.id)} className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
@@ -285,7 +308,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
                 const status = getProductStatus(p)
                 const category = categories.find(c => c.id === p.category_id)
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={String(p.id)} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">{i + 1}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
