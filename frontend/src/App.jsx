@@ -9,13 +9,17 @@ import SalesPage from './pages/SalesPage'
 import StockLogsPage from './pages/StockLogsPage'
 import ReportsPage from './pages/ReportsPage'
 import UsersPage from './pages/UsersPage'
+import RoomsPage from './pages/RoomsPage'
+import CheckInOutPage from './pages/CheckInOutPage'
 import {
   authAPI,
   categoryAPI,
   productAPI,
   salesAPI,
   stockLogsAPI,
-  usersAPI
+  usersAPI,
+  roomsAPI,
+  bookingsAPI
 } from './services/api'
 
 export default function App() {
@@ -48,6 +52,8 @@ export default function App() {
   const [sales, setSales] = useState([])
   const [stockLogs, setStockLogs] = useState([])
   const [users, setUsers] = useState([])
+  const [rooms, setRooms] = useState([])
+  const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const socketRef = useRef(null)
   const SOCKET_URL = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'https://amitygardenis.onrender.com'
@@ -77,10 +83,12 @@ export default function App() {
         categoryAPI.getAll(),
         productAPI.getAll(),
         salesAPI.getAll(),
-        stockLogsAPI.getAll()
+        stockLogsAPI.getAll(),
+        roomsAPI.getAll(),
+        bookingsAPI.getAll()
       ])
 
-      const [categoriesResult, productsResult, salesResult, logsResult] = results
+      const [categoriesResult, productsResult, salesResult, logsResult, roomsResult, bookingsResult] = results
 
       const handleRejected = (result, name) => {
         if (!result || result.status !== 'rejected') return
@@ -122,6 +130,20 @@ export default function App() {
         return
       }
 
+      if (roomsResult.status === 'fulfilled') {
+        setRooms(roomsResult.value)
+      } else if (handleRejected(roomsResult, 'rooms')) {
+        setLoading(false)
+        return
+      }
+
+      if (bookingsResult.status === 'fulfilled') {
+        setBookings(bookingsResult.value)
+      } else if (handleRejected(bookingsResult, 'bookings')) {
+        setLoading(false)
+        return
+      }
+
       if (currentUser.role === 'admin') {
         try {
           const usersData = await usersAPI.getAll()
@@ -155,7 +177,7 @@ export default function App() {
     }
 
     const socket = io(SOCKET_URL, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       auth: {
         token: localStorage.getItem('token')
       }
@@ -276,6 +298,46 @@ export default function App() {
     socket.on('user:deleted', (id) => {
       const normalizedId = normalizeId(id)
       setUsers((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
+    })
+
+    socket.on('room:created', (room) => {
+      const id = normalizeId(room.id)
+      setRooms((prev) => {
+        if (prev.some((item) => normalizeId(item.id) === id)) return prev
+        return [...prev, room]
+      })
+    })
+    socket.on('room:updated', (room) => {
+      const id = normalizeId(room.id)
+      setRooms((prev) => {
+        const exists = prev.some((item) => normalizeId(item.id) === id)
+        const updated = prev.map((item) => (normalizeId(item.id) === id ? room : item))
+        return exists ? updated : [...updated, room]
+      })
+    })
+    socket.on('room:deleted', (id) => {
+      const normalizedId = normalizeId(id)
+      setRooms((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
+    })
+
+    socket.on('booking:created', (booking) => {
+      const id = normalizeId(booking.id)
+      setBookings((prev) => {
+        if (prev.some((item) => normalizeId(item.id) === id)) return prev
+        return [...prev, booking]
+      })
+    })
+    socket.on('booking:updated', (booking) => {
+      const id = normalizeId(booking.id)
+      setBookings((prev) => {
+        const exists = prev.some((item) => normalizeId(item.id) === id)
+        const updated = prev.map((item) => (normalizeId(item.id) === id ? booking : item))
+        return exists ? updated : [...updated, booking]
+      })
+    })
+    socket.on('booking:deleted', (id) => {
+      const normalizedId = normalizeId(id)
+      setBookings((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
     })
 
     return () => {
@@ -459,6 +521,67 @@ export default function App() {
     setUsers((prev) => prev.filter((user) => user.id !== id))
   }
 
+  async function handleAddRoom(room) {
+    const newRoom = await roomsAPI.create(room)
+    const newRoomId = normalizeId(newRoom.id)
+    setRooms((prev) => {
+      if (prev.some((entry) => normalizeId(entry.id) === newRoomId)) {
+        return prev
+      }
+      return [...prev, newRoom]
+    })
+  }
+
+  async function handleEditRoom(id, room) {
+    await roomsAPI.update(id, room)
+    const normalizedId = normalizeId(id)
+    setRooms((prev) => prev.map((entry) => (normalizeId(entry.id) === normalizedId ? { ...entry, ...room } : entry)))
+  }
+
+  async function handleDeleteRoom(id) {
+    await roomsAPI.delete(id)
+    const normalizedId = normalizeId(id)
+    setRooms((prev) => prev.filter((entry) => normalizeId(entry.id) !== normalizedId))
+  }
+
+  async function handleCheckIn(bookingData) {
+    const newBooking = await bookingsAPI.create(bookingData)
+    const newBookingId = normalizeId(newBooking.id)
+    setBookings((prev) => {
+      if (prev.some((entry) => normalizeId(entry.id) === newBookingId)) {
+        return prev
+      }
+      return [...prev, newBooking]
+    })
+    // Reload rooms as room status is updated automatically
+    const roomsData = await roomsAPI.getAll()
+    setRooms(roomsData)
+  }
+
+  async function handleCheckOut(id) {
+    await bookingsAPI.checkout(id)
+    const normalizedId = normalizeId(id)
+    setBookings((prev) => prev.map((entry) => (normalizeId(entry.id) === normalizedId ? { ...entry, status: 'Checked Out', check_out_date: new Date().toISOString() } : entry)))
+    // Reload rooms as room status is updated automatically
+    const roomsData = await roomsAPI.getAll()
+    setRooms(roomsData)
+  }
+
+  async function handleUpdateBooking(id, bookingData) {
+    await bookingsAPI.update(id, bookingData)
+    const normalizedId = normalizeId(id)
+    setBookings((prev) => prev.map((entry) => (normalizeId(entry.id) === normalizedId ? { ...entry, ...bookingData } : entry)))
+  }
+
+  async function handleDeleteBooking(id) {
+    await bookingsAPI.delete(id)
+    const normalizedId = normalizeId(id)
+    setBookings((prev) => prev.filter((entry) => normalizeId(entry.id) !== normalizedId))
+    // Reload rooms as room status may be updated automatically
+    const roomsData = await roomsAPI.getAll()
+    setRooms(roomsData)
+  }
+
   if (!currentUser) {
     return <LoginPage onLogin={handleLogin} />
   }
@@ -466,7 +589,7 @@ export default function App() {
   function renderPage() {
     switch (currentPage) {
       case 'dashboard':
-        return <DashboardPage categories={categories} products={products} sales={sales} stockLogs={stockLogs} onNavigate={handleNavigate} />
+        return <DashboardPage categories={categories} products={products} sales={sales} stockLogs={stockLogs} rooms={rooms} bookings={bookings} onNavigate={handleNavigate} />
       case 'categories':
         return <CategoriesPage categories={categories} products={products} currentUser={currentUser} onAdd={handleAddCategory} onEdit={handleEditCategory} onDelete={handleDeleteCategory} />
       case 'products':
@@ -476,9 +599,13 @@ export default function App() {
       case 'stock-logs':
         return <StockLogsPage stockLogs={stockLogs} currentUser={currentUser} onDelete={handleDeleteStockLog} />
       case 'reports':
-        return <ReportsPage products={products} sales={sales} categories={categories} />
+        return <ReportsPage products={products} sales={sales} categories={categories} rooms={rooms} bookings={bookings} />
       case 'users':
         return <UsersPage users={users} onAdd={handleAddUser} onUpdate={handleEditUser} onDelete={handleDeleteUser} />
+      case 'rooms':
+        return <RoomsPage rooms={rooms} currentUser={currentUser} onAdd={handleAddRoom} onEdit={handleEditRoom} onDelete={handleDeleteRoom} />
+      case 'check-in-out':
+        return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} />
       default:
         return null
     }

@@ -227,3 +227,71 @@ export const usersAPI = {
     })
   }
 }
+
+// Rooms API
+export const roomsAPI = {
+  getAll: async () => {
+    return apiCall('/rooms')
+  },
+
+  create: async (roomData) => {
+    return apiCall('/rooms', {
+      method: 'POST',
+      body: JSON.stringify(roomData)
+    })
+  },
+
+  update: async (id, roomData) => {
+    return apiCall(`/rooms/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(roomData)
+    })
+  },
+
+  delete: async (id) => {
+    return apiCall(`/rooms/${id}`, {
+      method: 'DELETE'
+    })
+  }
+}
+
+// Bookings API
+export const bookingsAPI = {
+  getAll: async () => {
+    return apiCall('/bookings')
+  },
+
+  getActive: async () => {
+    return apiCall('/bookings/active')
+  },
+
+  getById: async (id) => {
+    return apiCall(`/bookings/${id}`)
+  },
+
+  create: async (bookingData) => {
+    return apiCall('/bookings', {
+      method: 'POST',
+      body: JSON.stringify(bookingData)
+    })
+  },
+
+  checkout: async (id) => {
+    return apiCall(`/bookings/${id}/checkout`, {
+      method: 'PUT'
+    })
+  },
+
+  update: async (id, bookingData) => {
+    return apiCall(`/bookings/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(bookingData)
+    })
+  },
+
+  delete: async (id) => {
+    return apiCall(`/bookings/${id}`, {
+      method: 'DELETE'
+    })
+  }
+}

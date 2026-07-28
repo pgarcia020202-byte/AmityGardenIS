@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Tag, Package, ShoppingBag,
-  ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon
+  ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon, Building, Bed, LogIn
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { page: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { header: 'Inventory Management' },
   { page: 'categories', label: 'Categories', icon: <Tag size={18} /> },
   { page: 'products', label: 'Products', icon: <Package size={18} /> },
   { page: 'sales', label: 'Sales', icon: <ShoppingBag size={18} /> },
   { page: 'stock-logs', label: 'Stock Logs', icon: <ClipboardList size={18} /> },
+  { header: 'Hotel Management' },
+  { page: 'rooms', label: 'Rooms', icon: <Bed size={18} /> },
+  { page: 'check-in-out', label: 'Check In/Out', icon: <LogIn size={18} /> },
+  { header: ' ' },
   { page: 'reports', label: 'Reports', icon: <BarChart3 size={18} />, adminOnly: true },
   { page: 'users', label: 'User Management', icon: <UserIcon size={18} />, adminOnly: true },
 ]
@@ -57,7 +62,18 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {visibleNav.map(item => {
+          {visibleNav.map((item, index) => {
+            if (item.header) {
+              return (
+                <div key={`header-${index}`} className="px-3 py-2 mt-4">
+                  {showText && (
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      {item.header}
+                    </p>
+                  )}
+                </div>
+              )
+            }
             const active = currentPage === item.page
             return (
               <button

@@ -9,6 +9,8 @@ import productRoutes from './routes/products.js';
 import salesRoutes from './routes/sales.js';
 import stockLogRoutes from './routes/stockLogs.js';
 import userRoutes from './routes/users.js';
+import roomRoutes from './routes/rooms.js';
+import bookingRoutes from './routes/bookings.js';
 
 dotenv.config();
 
@@ -40,6 +42,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/stock-logs', stockLogRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/rooms', roomRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 // Health check
 app.get('/', (req, res) => {
