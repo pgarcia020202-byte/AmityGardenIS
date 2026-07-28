@@ -25,9 +25,9 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
   const [formData, setFormData] = useState({
     room_number: '',
     room_type: 'Standard',
-    capacity: 2,
+    capacity: '',
     status: 'Available',
-    floor_number: 1
+    floor_number: ''
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -57,9 +57,9 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
     setFormData({
       room_number: '',
       room_type: 'Standard',
-      capacity: 2,
+      capacity: '',
       status: 'Available',
-      floor_number: 1
+      floor_number: ''
     })
     setError('')
     setAddOpen(true)
@@ -96,9 +96,9 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
       setFormData({
         room_number: '',
         room_type: 'Standard',
-        capacity: 2,
+        capacity: '',
         status: 'Available',
-        floor_number: 1
+        floor_number: ''
       })
       setError('')
       setAddOpen(false)
@@ -345,7 +345,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
                   type="number"
                   min="1"
                   value={formData.capacity}
-                  onChange={e => setFormData({ ...formData, capacity: parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, capacity: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -355,7 +355,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
                   type="number"
                   min="1"
                   value={formData.floor_number}
-                  onChange={e => setFormData({ ...formData, floor_number: parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, floor_number: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -420,7 +420,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
                   type="number"
                   min="1"
                   value={formData.capacity}
-                  onChange={e => setFormData({ ...formData, capacity: parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, capacity: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -430,7 +430,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
                   type="number"
                   min="1"
                   value={formData.floor_number}
-                  onChange={e => setFormData({ ...formData, floor_number: parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, floor_number: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>

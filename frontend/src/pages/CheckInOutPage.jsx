@@ -195,7 +195,7 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
                   type="number"
                   min="1"
                   value={formData.number_of_guests}
-                  onChange={e => setFormData({ ...formData, number_of_guests: parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, number_of_guests: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -206,7 +206,7 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
                   min="0"
                   step="0.01"
                   value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                  onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -276,8 +276,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     room_id: '',
     guest_name: '',
     guest_contact: '',
-    number_of_guests: 1,
-    price: 0,
+    number_of_guests: '',
+    price: '',
     notes: ''
   })
   const [error, setError] = useState('')
@@ -315,8 +315,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       room_id: '',
       guest_name: '',
       guest_contact: '',
-      number_of_guests: 1,
-      price: 0,
+      number_of_guests: '',
+      price: '',
       notes: ''
     })
     setError('')
@@ -336,8 +336,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
         room_id: '',
         guest_name: '',
         guest_contact: '',
-        number_of_guests: 1,
-        price: 0,
+        number_of_guests: '',
+        price: '',
         notes: ''
       })
       setError('')
@@ -640,7 +640,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     type="number"
                     min="1"
                     value={formData.number_of_guests}
-                    onChange={e => setFormData({ ...formData, number_of_guests: parseInt(e.target.value) || 1 })}
+                    onChange={e => setFormData({ ...formData, number_of_guests: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     required
                   />
@@ -652,7 +652,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     min="0"
                     step="0.01"
                     value={formData.price}
-                    onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                    onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     required
                   />
