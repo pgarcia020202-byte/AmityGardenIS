@@ -926,7 +926,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Timer Duration (hours)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Timer (hours)</label>
                   <input
                     type="number"
                     min="0.1"
