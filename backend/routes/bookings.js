@@ -10,7 +10,7 @@ router.get('/', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.created_at, b.updated_at
+              b.timer_duration, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        ORDER BY b.check_in_date DESC`
@@ -28,7 +28,7 @@ router.get('/active', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.created_at, b.updated_at
+              b.timer_duration, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        WHERE b.status = 'Checked In'
@@ -48,7 +48,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.created_at, b.updated_at
+              b.timer_duration, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        WHERE b.id = $1`,
@@ -67,7 +67,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create booking (check-in) (admin or staff)
 router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
-    const { room_id, guest_name, guest_contact, number_of_guests, price, notes } = req.body;
+    const { room_id, guest_name, guest_contact, number_of_guests, price, notes, timer_duration } = req.body;
 
     if (!room_id) {
       return res.status(400).json({ error: 'Room is required' });
@@ -89,12 +89,13 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
     }
 
     const trimmedGuestName = guest_name ? guest_name.trim() : null;
+    const timerDurationValue = timer_duration || 30; // Default to 30 minutes if not provided
 
     const result = await pool.query(
-      `INSERT INTO bookings (room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, 'Checked In', $6)
-       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, created_at, updated_at`,
-      [room_id, trimmedGuestName, guest_contact, number_of_guests, price, notes]
+      `INSERT INTO bookings (room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration)
+       VALUES ($1, $2, $3, $4, $5, NOW(), 'Checked In', $6, $7)
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, created_at, updated_at`,
+      [room_id, trimmedGuestName, guest_contact, number_of_guests, price, notes, timerDurationValue]
     );
 
     const newBooking = result.rows[0];
@@ -145,10 +146,10 @@ router.put('/:id/checkout', authenticate, requireAdminOrStaff, async (req, res) 
     const roomId = booking.rows[0].room_id;
 
     const result = await pool.query(
-      `UPDATE bookings 
-       SET check_out_date = CURRENT_TIMESTAMP, status = 'Checked Out', updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $1 
-       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, created_at, updated_at`,
+      `UPDATE bookings
+       SET check_out_date = NOW(), status = 'Checked Out', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, created_at, updated_at`,
       [id]
     );
 
@@ -217,9 +218,9 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
            notes = COALESCE($5, notes),
            status = COALESCE($6, status),
            price = COALESCE($7, price),
-           updated_at = CURRENT_TIMESTAMP
+           updated_at = NOW()
        WHERE id = $8
-       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, created_at, updated_at`,
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, created_at, updated_at`,
       [room_id, guest_name?.trim(), guest_contact, number_of_guests, notes, status, price, id]
     );
 
@@ -307,6 +308,73 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   } catch (error) {
     console.error('Delete booking error:', error);
     res.status(500).json({ error: 'Failed to delete booking' });
+  }
+});
+
+// Extend booking time (admin or staff)
+router.put('/:id/extend', authenticate, requireAdminOrStaff, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { extend_hours, extra_price } = req.body;
+
+    if (!extend_hours || extend_hours <= 0) {
+      return res.status(400).json({ error: 'Extension hours must be greater than 0' });
+    }
+    if (extra_price < 0) {
+      return res.status(400).json({ error: 'Extra price cannot be negative' });
+    }
+
+    // Check if booking exists and is checked in
+    const booking = await pool.query('SELECT id, room_id, status, price, check_out_date, timer_duration FROM bookings WHERE id = $1', [id]);
+    if (booking.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (booking.rows[0].status !== 'Checked In') {
+      return res.status(400).json({ error: 'Booking is not checked in' });
+    }
+
+    const currentPrice = Number(booking.rows[0].price) || 0;
+    const currentCheckOutDate = booking.rows[0].check_out_date;
+    const currentTimerDuration = Number(booking.rows[0].timer_duration) || 30;
+    
+    // Extend check_out_date by the specified hours
+    const newCheckOutDate = currentCheckOutDate 
+      ? new Date(new Date(currentCheckOutDate).getTime() + (extend_hours * 60 * 60 * 1000))
+      : new Date(Date.now() + (extend_hours * 60 * 60 * 1000));
+
+    const result = await pool.query(
+      `UPDATE bookings
+       SET price = $1,
+           check_out_date = $2,
+           timer_duration = $3,
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, created_at, updated_at`,
+      [currentPrice + Number(extra_price), newCheckOutDate, currentTimerDuration + (extend_hours * 60), id]
+    );
+
+    const updatedBooking = result.rows[0];
+
+    // Fetch room details to include in response
+    const roomDetails = await pool.query(
+      'SELECT id, room_number, room_type, capacity, status, floor_number FROM rooms WHERE id = $1',
+      [updatedBooking.room_id]
+    );
+
+    const bookingWithRoom = {
+      ...updatedBooking,
+      room_number: roomDetails.rows[0]?.room_number,
+      room_type: roomDetails.rows[0]?.room_type
+    };
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    io.emit('booking:updated', bookingWithRoom);
+
+    res.json(bookingWithRoom);
+  } catch (error) {
+    console.error('Extend booking error:', error);
+    res.status(500).json({ error: 'Failed to extend booking' });
   }
 });
 

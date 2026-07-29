@@ -293,5 +293,12 @@ export const bookingsAPI = {
     return apiCall(`/bookings/${id}`, {
       method: 'DELETE'
     })
+  },
+
+  extend: async (id, extendHours, extraPrice) => {
+    return apiCall(`/bookings/${id}/extend`, {
+      method: 'PUT',
+      body: JSON.stringify({ extend_hours: extendHours, extra_price: extraPrice })
+    })
   }
 }

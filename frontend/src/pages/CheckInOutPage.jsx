@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Search, Plus, Pencil, Trash2, LogIn, LogOut, X, AlertCircle, Check, Bed, User, Phone, Mail, Users, Calendar, Eye, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Plus, Pencil, Trash2, LogIn, LogOut, X, AlertCircle, Check, Bed, User, Phone, Mail, Users, Calendar, Eye, Clock, Timer, ClockPlus } from 'lucide-react'
 
 function Modal({ title, onClose, children }) {
   return (
@@ -10,6 +10,218 @@ function Modal({ title, onClose, children }) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
         <div className="p-4 sm:p-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function CountdownTimer({ checkInDate, durationMinutes = 30, onTimerEnd }) {
+  const [timeLeft, setTimeLeft] = useState(null)
+
+  useEffect(() => {
+    if (!checkInDate) return
+
+    // Parse the check-in date (database already handles Asia/Manila timezone)
+    const checkInTime = new Date(checkInDate).getTime()
+    const endTime = checkInTime + (durationMinutes * 60 * 1000)
+
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime()
+      const remaining = endTime - now
+
+      if (remaining <= 0) {
+        setTimeLeft(0)
+        if (onTimerEnd) onTimerEnd()
+        return
+      }
+
+      setTimeLeft(remaining)
+    }
+
+    calculateTimeLeft()
+    const interval = setInterval(calculateTimeLeft, 1000)
+
+    return () => clearInterval(interval)
+  }, [checkInDate, durationMinutes, onTimerEnd])
+
+  if (timeLeft === null) return null
+
+  const hours = Math.floor(timeLeft / (60 * 60 * 1000))
+  const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000))
+  const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000)
+
+  const isExpired = timeLeft <= 0
+  const isLow = timeLeft > 0 && timeLeft < (5 * 60 * 1000) // Less than 5 minutes
+
+  return (
+    <div className={`flex items-center gap-1.5 text-xs font-medium ${
+      isExpired ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-emerald-600'
+    }`}>
+      <Timer size={12} className={isExpired ? 'animate-pulse' : ''} />
+      <span>
+        {isExpired ? 'Expired' : `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
+      </span>
+    </div>
+  )
+}
+
+function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
+  const [selectedBookingId, setSelectedBookingId] = useState('')
+  const [extendHours, setExtendHours] = useState('')
+  const [extraPrice, setExtraPrice] = useState('')
+  const [extending, setExtending] = useState(false)
+  const [error, setError] = useState('')
+  const [roomSearch, setRoomSearch] = useState('')
+  const [roomTypeFilter, setRoomTypeFilter] = useState('All')
+
+  const checkedInBookings = bookings.filter(b => b.status === 'Checked In')
+
+  const filteredBookings = checkedInBookings.filter(b => {
+    const matchesSearch = (b.room_number || '').toLowerCase().includes(roomSearch.toLowerCase())
+    const matchesType = roomTypeFilter === 'All' || b.room_type === roomTypeFilter
+    return matchesSearch && matchesType
+  })
+  const selectedBooking = checkedInBookings.find(b => b.id === selectedBookingId)
+  const currentPrice = selectedBooking ? Number(selectedBooking.price) : 0
+  const newTotalPrice = currentPrice + Number(extraPrice || 0)
+
+  function handleExtend() {
+    if (extending) return
+    if (!selectedBookingId) {
+      setError('Please select Room.')
+      return
+    }
+    if (extendHours <= 0) {
+      setError('Extension hours must be greater than 0.')
+      return
+    }
+    if (extraPrice < 0) {
+      setError('Extra price cannot be negative.')
+      return
+    }
+    setError('')
+    setExtending(true)
+    onExtend(selectedBookingId, extendHours, extraPrice)
+      .then(() => {
+        setExtending(false)
+        onClose()
+      })
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'Failed to extend booking')
+        setExtending(false)
+      })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">Select Room</label>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={roomSearch}
+              onChange={e => setRoomSearch(e.target.value)}
+              placeholder="Search rooms…"
+              className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+            />
+          </div>
+          <select
+            value={roomTypeFilter}
+            onChange={e => setRoomTypeFilter(e.target.value)}
+            className="px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="All">All Types</option>
+            <option value="Standard">Standard</option>
+            <option value="Family">Family</option>
+            <option value="Barkada">Barkada</option>
+          </select>
+        </div>
+        <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2">
+          {filteredBookings.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-4">No checked-in rooms match your search</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {filteredBookings.map(booking => (
+                <button
+                  key={booking.id}
+                  type="button"
+                  onClick={() => setSelectedBookingId(booking.id)}
+                  className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 ${
+                    selectedBookingId === booking.id
+                      ? 'border-blue-300 bg-blue-50'
+                      : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-slate-800 truncate">{booking.room_number}</span>
+                    <span className="text-xs text-slate-400 ml-2 whitespace-nowrap">{booking.room_type}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {selectedBookingId && (
+          <p className="text-xs text-slate-600 mt-2">
+            Selected: {checkedInBookings.find(b => b.id === selectedBookingId)?.room_number} ({checkedInBookings.find(b => b.id === selectedBookingId)?.room_type})
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Extend Hours</label>
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={extendHours}
+            onChange={e => setExtendHours(e.target.value)}
+            placeholder="1"
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Extra Price (₱)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={extraPrice}
+            onChange={e => setExtraPrice(e.target.value)}
+            placeholder="0.00"
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+      {selectedBooking && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">Current Price:</span>
+            <span className="font-medium text-slate-900">₱{currentPrice.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">Extra Price:</span>
+            <span className="font-medium text-slate-900">₱{Number(extraPrice).toFixed(2)}</span>
+          </div>
+          <div className="border-t border-blue-200 pt-2 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-700">New Total:</span>
+            <span className="font-bold text-blue-600">₱{newTotalPrice.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+            <span>Time Extension:</span>
+            <span className="font-medium">+{extendHours} hour(s)</span>
+          </div>
+        </div>
+      )}
+      {error && (
+        <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{error}</p>
+      )}
+      <div className="flex gap-3 pt-1">
+        <button onClick={onClose} disabled={extending} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 disabled:opacity-50">Cancel</button>
+        <button onClick={handleExtend} disabled={extending} className="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all duration-200">
+          {extending ? 'Extending…' : 'Extend Time'}
+        </button>
       </div>
     </div>
   )
@@ -85,30 +297,53 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
 
   const formatDate = (dateString) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleString('en-PH', {
+    const date = new Date(dateString)
+    // Database already handles Asia/Manila timezone
+    
+    const options = {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    })
+      minute: '2-digit',
+      hour12: true
+    }
+    return date.toLocaleString('en-PH', options)
   }
 
   return (
     <>
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <Clock size={14} className="text-slate-400 shrink-0" />
-          <span>Checked In: {formatDate(viewTarget.check_in_date)}</span>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-slate-900">Room:</span> {viewTarget.room_number} ({viewTarget.room_type})
+          </div>
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-slate-900">Price:</span> ₱{Number(viewTarget.price).toFixed(2) || '0.00'}
+          </div>
         </div>
-        {viewTarget.check_out_date && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-slate-900">Guest Name:</span> {viewTarget.guest_name || 'NA'}
+          </div>
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-slate-900">Contact Number:</span> {viewTarget.guest_contact || 'NA'}
+          </div>
+        </div>
+        <div className="text-sm text-slate-600">
+          <span className="font-medium text-slate-900">Notes:</span> {viewTarget.notes || 'NA'}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <Clock size={14} className="text-slate-400 shrink-0" />
-            <span>Checked Out: {formatDate(viewTarget.check_out_date)}</span>
+            <span>Checked In: {formatDate(viewTarget.check_in_date)}</span>
           </div>
-        )}
-        <div className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">Room:</span> {viewTarget.room_number} ({viewTarget.room_type})
+          {viewTarget.check_out_date && (
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Clock size={14} className="text-slate-400 shrink-0" />
+              <span>Checked Out: {formatDate(viewTarget.check_out_date)}</span>
+            </div>
+          )}
         </div>
 
         {isEditing ? (
@@ -195,7 +430,8 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
                   type="number"
                   min="1"
                   value={formData.number_of_guests}
-                  onChange={e => setFormData({ ...formData, number_of_guests: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
+                  onChange={e => setFormData({ ...formData, number_of_guests: e.target.value })}
+                  placeholder="1"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
@@ -206,28 +442,14 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
                   min="0"
                   step="0.01"
                   value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })}
+                  onChange={e => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0.00"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-sm text-slate-600">
-              <span className="font-medium text-slate-900">Guest Name:</span> {viewTarget.guest_name || 'NA'}
-            </div>
-            <div className="text-sm text-slate-600">
-              <span className="font-medium text-slate-900">Contact Number:</span> {viewTarget.guest_contact || 'NA'}
-            </div>
-            <div className="text-sm text-slate-600">
-              <span className="font-medium text-slate-900">Price:</span> ₱{Number(viewTarget.price).toFixed(2) || '0.00'}
-            </div>
-            <div className="text-sm text-slate-600">
-              <span className="font-medium text-slate-900">Notes:</span> {viewTarget.notes || 'NA'}
-            </div>
-          </div>
-        )}
+        ) : null}
 
         {modalError && (
           <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{modalError}</p>
@@ -264,10 +486,11 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
   )
 }
 
-export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn, onCheckOut, onUpdate, onDelete }) {
+export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn, onCheckOut, onUpdate, onDelete, onExtend }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [addOpen, setAddOpen] = useState(false)
+  const [extendOpen, setExtendOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [roomSearch, setRoomSearch] = useState('')
@@ -278,11 +501,39 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     guest_contact: '',
     number_of_guests: '',
     price: '',
-    notes: ''
+    notes: '',
+    timer_duration: ''
+  })
+  const [extendFormData, setExtendFormData] = useState({
+    booking_id: '',
+    extend_hours: '',
+    extra_price: ''
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [expiredTimers, setExpiredTimers] = useState(new Set())
+
+  const handleTimerEnd = (bookingId) => {
+    if (!expiredTimers.has(bookingId)) {
+      setExpiredTimers(prev => new Set([...prev, bookingId]))
+      
+      // Show browser notification if permission granted
+      if (Notification.permission === 'granted') {
+        new Notification('Check-in Timer Expired', {
+          body: 'The check-in timer has expired. Please follow up with the guest.',
+          icon: '/favicon.ico'
+        })
+      }
+    }
+  }
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   const availableRooms = rooms.filter(r => r.status === 'Available')
 
@@ -317,7 +568,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       guest_contact: '',
       number_of_guests: '',
       price: '',
-      notes: ''
+      notes: '',
+      timer_duration: ''
     })
     setError('')
     setAddOpen(true)
@@ -329,16 +581,23 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     if (!formData.room_id) { setError('Room is required.'); return }
     if (!formData.number_of_guests || formData.number_of_guests <= 0) { setError('Number of guests must be greater than 0.'); return }
     if (formData.price < 0) { setError('Price cannot be negative.'); return }
+    if (!formData.timer_duration || formData.timer_duration <= 0) { setError('Timer duration must be greater than 0.'); return }
     setLoading(true)
     try {
-      await onCheckIn(formData)
+      // Convert hours to minutes for the backend
+      const formDataInMinutes = {
+        ...formData,
+        timer_duration: Math.round(parseFloat(formData.timer_duration) * 60)
+      }
+      await onCheckIn(formDataInMinutes)
       setFormData({
         room_id: '',
         guest_name: '',
         guest_contact: '',
         number_of_guests: '',
         price: '',
-        notes: ''
+        notes: '',
+        timer_duration: ''
       })
       setError('')
       setAddOpen(false)
@@ -406,15 +665,22 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
             <option value="All">All Status</option>
             <option value="Checked In">Checked In</option>
             <option value="Checked Out">Checked Out</option>
-            <option value="Reserved">Reserved</option>
           </select>
           {canManage && (
-            <button
-              onClick={openAdd}
-              className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
-            >
-              <LogIn size={16} className="group-hover:scale-110 transition-transform" /> Check In
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={openAdd}
+                className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
+              >
+                <LogIn size={16} className="group-hover:scale-110 transition-transform" /> Check In
+              </button>
+              <button
+                onClick={() => setExtendOpen(true)}
+                className="group flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/25 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
+              >
+                <ClockPlus size={16} className="group-hover:scale-110 transition-transform" /> Extend
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -431,13 +697,14 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                 <th className="w-36 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Check In</th>
                 <th className="w-36 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Check Out</th>
                 <th className="w-28 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="w-28 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Timer</th>
                 {canManage && <th className="w-32 px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
                     {search ? 'No bookings match your search.' : 'No bookings yet.'}
                   </td>
                 </tr>
@@ -460,6 +727,13 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     <span className={`text-xs font-medium px-2.5 py-1 rounded border ${getStatusColor(booking.status)}`}>
                       {booking.status}
                     </span>
+                  </td>
+                  <td className="w-28 px-4 py-3.5">
+                    {booking.status === 'Checked In' && booking.check_in_date ? (
+                      <CountdownTimer checkInDate={booking.check_in_date} durationMinutes={booking.timer_duration || 30} onTimerEnd={() => handleTimerEnd(booking.id)} />
+                    ) : (
+                      <span className="text-xs text-slate-400">-</span>
+                    )}
                   </td>
                   {canManage && (
                     <td className="w-32 px-4 py-3.5 text-right">
@@ -517,12 +791,12 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                 {booking.status}
               </span>
             </div>
-            <div className="space-y-2 mb-3">
+            <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="flex items-center gap-2 text-sm">
                 <Users size={14} className="text-slate-400" />
                 <span className="text-slate-600">{booking.number_of_guests} guests</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm justify-end">
                 <span className="text-slate-400">₱</span>
                 <span className="text-slate-600">{Number(booking.price).toFixed(2)}</span>
               </div>
@@ -530,6 +804,11 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                 <Calendar size={14} className="text-slate-400" />
                 <span className="text-slate-600">{formatDate(booking.check_in_date)}</span>
               </div>
+              {booking.status === 'Checked In' && booking.check_in_date && (
+                <div className="flex items-center gap-2 text-sm justify-end">
+                  <CountdownTimer checkInDate={booking.check_in_date} durationMinutes={booking.timer_duration || 30} onTimerEnd={() => handleTimerEnd(booking.id)} />
+                </div>
+              )}
             </div>
             {canManage && (
               <div className="flex gap-2 pt-2 border-t border-slate-100">
@@ -633,14 +912,28 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Number of Guests</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Guests</label>
                   <input
                     type="number"
                     min="1"
                     value={formData.number_of_guests}
-                    onChange={e => setFormData({ ...formData, number_of_guests: e.target.value === '' ? '' : parseInt(e.target.value) || 1 })}
+                    onChange={e => setFormData({ ...formData, number_of_guests: e.target.value })}
+                    placeholder="1"
+                    className="w-20 px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Timer Duration (hours)</label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={formData.timer_duration}
+                    onChange={e => setFormData({ ...formData, timer_duration: e.target.value })}
+                    placeholder="0.5"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     required
                   />
@@ -652,7 +945,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     min="0"
                     step="0.01"
                     value={formData.price}
-                    onChange={e => setFormData({ ...formData, price: e.target.value === '' ? '' : parseFloat(e.target.value) || 0 })}
+                    onChange={e => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="0.00"
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     required
                   />
@@ -711,6 +1005,18 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Extend Time Modal */}
+      {extendOpen && (
+        <Modal title="Extend Booking Time" onClose={() => setExtendOpen(false)}>
+          <ExtendTimeModal
+            bookings={bookings}
+            rooms={rooms}
+            onClose={() => setExtendOpen(false)}
+            onExtend={onExtend}
+          />
         </Modal>
       )}
     </div>

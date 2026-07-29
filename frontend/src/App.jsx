@@ -582,6 +582,13 @@ export default function App() {
     setRooms(roomsData)
   }
 
+  async function handleExtendBooking(bookingId, extendHours, extraPrice) {
+    await bookingsAPI.extend(bookingId, extendHours, extraPrice)
+    // Reload bookings to get updated values from backend
+    const bookingsData = await bookingsAPI.getAll()
+    setBookings(bookingsData)
+  }
+
   if (!currentUser) {
     return <LoginPage onLogin={handleLogin} />
   }
@@ -605,7 +612,7 @@ export default function App() {
       case 'rooms':
         return <RoomsPage rooms={rooms} currentUser={currentUser} onAdd={handleAddRoom} onEdit={handleEditRoom} onDelete={handleDeleteRoom} />
       case 'check-in-out':
-        return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} />
+        return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} onExtend={handleExtendBooking} />
       default:
         return null
     }
