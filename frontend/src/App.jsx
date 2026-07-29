@@ -19,7 +19,8 @@ import {
   stockLogsAPI,
   usersAPI,
   roomsAPI,
-  bookingsAPI
+  bookingsAPI,
+  notificationsAPI
 } from './services/api'
 
 export default function App() {
@@ -54,8 +55,12 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [rooms, setRooms] = useState([])
   const [bookings, setBookings] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [highlightedBookingId, setHighlightedBookingId] = useState(null)
   const [loading, setLoading] = useState(true)
   const socketRef = useRef(null)
+  const bookingsRef = useRef(bookings)
+  const notifiedBookingIdsRef = useRef(new Set())
   const SOCKET_URL = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'https://amitygardenis.onrender.com'
 
   const normalizeId = (value) => (value === undefined || value === null ? '' : String(value))
@@ -326,18 +331,38 @@ export default function App() {
         if (prev.some((item) => normalizeId(item.id) === id)) return prev
         return [...prev, booking]
       })
+      // Check for 15-minute warnings after new booking
+      setTimeout(() => checkFifteenMinuteWarnings(), 100)
     })
-    socket.on('booking:updated', (booking) => {
+    socket.on('booking:updated', async (booking) => {
       const id = normalizeId(booking.id)
       setBookings((prev) => {
         const exists = prev.some((item) => normalizeId(item.id) === id)
         const updated = prev.map((item) => (normalizeId(item.id) === id ? booking : item))
         return exists ? updated : [...updated, booking]
       })
+      // Clear notifications for this booking
+      try {
+        await notificationsAPI.deleteByBooking(id)
+      } catch (error) {
+        console.error('Error deleting booking notifications:', error)
+      }
+      setNotifications(prev => prev.filter(n => n.bookingId !== id))
+      // Check for 15-minute warnings after booking update
+      setTimeout(() => checkFifteenMinuteWarnings(), 100)
     })
-    socket.on('booking:deleted', (id) => {
+    socket.on('booking:deleted', async (id) => {
       const normalizedId = normalizeId(id)
       setBookings((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
+      // Clear notifications for this booking
+      try {
+        await notificationsAPI.deleteByBooking(normalizedId)
+      } catch (error) {
+        console.error('Error deleting booking notifications:', error)
+      }
+      setNotifications(prev => prev.filter(n => n.bookingId !== normalizedId))
+      // Check for 15-minute warnings after booking deletion
+      setTimeout(() => checkFifteenMinuteWarnings(), 100)
     })
 
     return () => {
@@ -346,6 +371,134 @@ export default function App() {
       socketRef.current = null
     }
   }, [currentUser, SOCKET_URL])
+
+  // Check for bookings with 15 minutes remaining
+  const checkFifteenMinuteWarnings = async () => {
+    if (!currentUser || bookingsRef.current.length === 0) return
+
+    const now = new Date().getTime()
+    const fifteenMinutes = 15 * 60 * 1000
+
+    // Check for expired bookings and clear their notifications
+    const expiredBookings = bookingsRef.current
+      .filter(b => b.status === 'Checked In' && b.check_in_date && b.timer_duration)
+      .filter(b => {
+        const checkInTime = new Date(b.check_in_date).getTime()
+        const endTime = checkInTime + (b.timer_duration * 60 * 1000)
+        const remaining = endTime - now
+        return remaining <= 0
+      })
+
+    for (const booking of expiredBookings) {
+      if (notifiedBookingIdsRef.current.has(booking.id)) {
+        try {
+          await notificationsAPI.deleteByBooking(booking.id)
+          notifiedBookingIdsRef.current.delete(booking.id)
+          setNotifications(prev => prev.filter(n => n.bookingId !== booking.id))
+        } catch (error) {
+          console.error('Error deleting expired notification:', error)
+        }
+      }
+    }
+
+    const newWarnings = bookingsRef.current
+      .filter(b => b.status === 'Checked In' && b.check_in_date && b.timer_duration)
+      .filter(b => {
+        const checkInTime = new Date(b.check_in_date).getTime()
+        const endTime = checkInTime + (b.timer_duration * 60 * 1000)
+        const remaining = endTime - now
+        const isFifteenMinuteWarning = remaining > 0 && remaining <= fifteenMinutes
+        return isFifteenMinuteWarning && !notifiedBookingIdsRef.current.has(b.id)
+      })
+      .map(booking => ({
+        id: Date.now() + Math.random(),
+        bookingId: booking.id,
+        message: '15 minutes remaining',
+        roomNumber: `Room ${booking.room_number}`,
+        time: new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+        read: false
+      }))
+
+    if (newWarnings.length > 0) {
+      // Add new booking IDs to the notified set
+      newWarnings.forEach(warning => {
+        notifiedBookingIdsRef.current.add(warning.bookingId)
+      })
+      
+      // Save notifications to database
+      for (const warning of newWarnings) {
+        try {
+          await notificationsAPI.create({
+            booking_id: warning.bookingId,
+            message: warning.message,
+            room_number: warning.roomNumber
+          })
+        } catch (error) {
+          console.error('Error saving notification to database:', error)
+        }
+      }
+      
+      setNotifications(prev => [...newWarnings, ...prev])
+
+      // Show browser notification if permission granted
+      if (Notification.permission === 'granted') {
+        newWarnings.forEach(warning => {
+          new Notification('Time Warning', {
+            body: `${warning.roomNumber} - ${warning.message}`,
+            icon: '/favicon.ico'
+          })
+        })
+      }
+    }
+  }
+
+  // Update bookings ref whenever bookings state changes
+  useEffect(() => {
+    bookingsRef.current = bookings
+  }, [bookings])
+
+  // Load notifications from API on mount
+  useEffect(() => {
+    if (!currentUser) return
+    
+    const loadNotifications = async () => {
+      try {
+        const data = await notificationsAPI.getAll()
+        const formatted = data.map(n => ({
+          id: n.id,
+          bookingId: n.booking_id,
+          message: n.message,
+          roomNumber: n.room_number,
+          time: new Date(n.created_at).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+          read: n.read
+        }))
+        setNotifications(formatted)
+        // Initialize notifiedBookingIdsRef from loaded notifications
+        notifiedBookingIdsRef.current = new Set(formatted.map(n => n.bookingId))
+      } catch (error) {
+        console.error('Error loading notifications:', error)
+      }
+    }
+    
+    loadNotifications()
+  }, [currentUser])
+
+
+  useEffect(() => {
+    if (!currentUser || bookingsRef.current.length === 0) return
+
+    checkFifteenMinuteWarnings()
+    const interval = setInterval(checkFifteenMinuteWarnings, 30000) // Check every 30 seconds as fallback
+
+    return () => clearInterval(interval)
+  }, [currentUser, notifications])
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
 
   function handleLogin(user) {
     setCurrentUser(user)
@@ -589,6 +742,48 @@ export default function App() {
     setBookings(bookingsData)
   }
 
+  async function handleDismissNotification(id) {
+    const notification = notifications.find(n => n.id === id)
+    if (notification) {
+      notifiedBookingIdsRef.current.delete(notification.bookingId)
+    }
+    try {
+      await notificationsAPI.delete(id)
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+    }
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  async function handleDismissAllNotifications() {
+    notifiedBookingIdsRef.current.clear()
+    try {
+      await notificationsAPI.deleteAll()
+    } catch (error) {
+      console.error('Error deleting all notifications:', error)
+    }
+    setNotifications([])
+  }
+
+  function handleNotificationClick(bookingId) {
+    setHighlightedBookingId(bookingId)
+    handleNavigate('check-in-out')
+  }
+
+  function handlePageClick() {
+    setHighlightedBookingId(null)
+  }
+
+  async function handleTimerEnd(bookingId) {
+    try {
+      await notificationsAPI.deleteByBooking(bookingId)
+      notifiedBookingIdsRef.current.delete(bookingId)
+      setNotifications(prev => prev.filter(n => n.bookingId !== bookingId))
+    } catch (error) {
+      console.error('Error deleting notification on timer end:', error)
+    }
+  }
+
   if (!currentUser) {
     return <LoginPage onLogin={handleLogin} />
   }
@@ -612,14 +807,24 @@ export default function App() {
       case 'rooms':
         return <RoomsPage rooms={rooms} currentUser={currentUser} onAdd={handleAddRoom} onEdit={handleEditRoom} onDelete={handleDeleteRoom} />
       case 'check-in-out':
-        return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} onExtend={handleExtendBooking} />
+        return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} onExtend={handleExtendBooking} highlightedBookingId={highlightedBookingId} onTimerEnd={handleTimerEnd} />
       default:
         return null
     }
   }
 
   return (
-    <Layout currentUser={currentUser} currentPage={currentPage} onNavigate={handleNavigate} onLogout={handleLogout}>
+    <Layout
+      currentUser={currentUser}
+      currentPage={currentPage}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      notifications={notifications}
+      onDismissNotification={handleDismissNotification}
+      onDismissAllNotifications={handleDismissAllNotifications}
+      onNotificationClick={handleNotificationClick}
+      onPageClick={handlePageClick}
+    >
       {renderPage()}
     </Layout>
   )

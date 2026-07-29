@@ -334,23 +334,16 @@ router.put('/:id/extend', authenticate, requireAdminOrStaff, async (req, res) =>
     }
 
     const currentPrice = Number(booking.rows[0].price) || 0;
-    const currentCheckOutDate = booking.rows[0].check_out_date;
     const currentTimerDuration = Number(booking.rows[0].timer_duration) || 30;
-    
-    // Extend check_out_date by the specified hours
-    const newCheckOutDate = currentCheckOutDate 
-      ? new Date(new Date(currentCheckOutDate).getTime() + (extend_hours * 60 * 60 * 1000))
-      : new Date(Date.now() + (extend_hours * 60 * 60 * 1000));
 
     const result = await pool.query(
       `UPDATE bookings
        SET price = $1,
-           check_out_date = $2,
-           timer_duration = $3,
+           timer_duration = $2,
            updated_at = NOW()
-       WHERE id = $4
+       WHERE id = $3
        RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, created_at, updated_at`,
-      [currentPrice + Number(extra_price), newCheckOutDate, currentTimerDuration + (extend_hours * 60), id]
+      [currentPrice + Number(extra_price), currentTimerDuration + (extend_hours * 60), id]
     );
 
     const updatedBooking = result.rows[0];

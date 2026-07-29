@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Tag, Package, ShoppingBag,
   ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon, Building, Bed, LogIn
 } from 'lucide-react'
+import NotificationMenu from '../components/NotificationMenu'
 
 const NAV_ITEMS = [
   { page: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -19,7 +20,7 @@ const NAV_ITEMS = [
   { page: 'users', label: 'User Management', icon: <UserIcon size={18} />, adminOnly: true },
 ]
 
-export default function Layout({ currentUser, currentPage, onNavigate, onLogout, children }) {
+export default function Layout({ currentUser, currentPage, onNavigate, onLogout, notifications, onDismissNotification, onDismissAllNotifications, onNotificationClick, onPageClick, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -164,6 +165,12 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
             </p>
           </div>
           <div className="ml-auto flex items-center gap-3">
+            <NotificationMenu 
+              notifications={notifications} 
+              onDismiss={onDismissNotification}
+              onDismissAll={onDismissAllNotifications}
+              onNotificationClick={onNotificationClick}
+            />
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${currentUser.role === 'admin' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
               {currentUser.role === 'admin' ? 'Administrator' : 'Staff'}
             </span>
@@ -172,7 +179,7 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto" onClick={onPageClick}>
           {children}
         </main>
       </div>

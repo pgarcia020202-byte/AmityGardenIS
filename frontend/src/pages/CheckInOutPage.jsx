@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Plus, Pencil, Trash2, LogIn, LogOut, X, AlertCircle, Check, Bed, User, Phone, Mail, Users, Calendar, Eye, Clock, Timer, ClockPlus } from 'lucide-react'
 
 function Modal({ title, onClose, children }) {
@@ -51,7 +51,7 @@ function CountdownTimer({ checkInDate, durationMinutes = 30, onTimerEnd }) {
   const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000)
 
   const isExpired = timeLeft <= 0
-  const isLow = timeLeft > 0 && timeLeft < (5 * 60 * 1000) // Less than 5 minutes
+  const isLow = timeLeft > 0 && timeLeft < (15 * 60 * 1000) // Less than 15 minutes
 
   return (
     <div className={`flex items-center gap-1.5 text-xs font-medium ${
@@ -84,6 +84,30 @@ function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
   const selectedBooking = checkedInBookings.find(b => b.id === selectedBookingId)
   const currentPrice = selectedBooking ? Number(selectedBooking.price) : 0
   const newTotalPrice = currentPrice + Number(extraPrice || 0)
+
+  // Helper function to get timer color for a booking
+  const getTimerColor = (booking) => {
+    if (!booking.check_in_date || !booking.timer_duration) return 'green'
+    const checkInTime = new Date(booking.check_in_date).getTime()
+    const endTime = checkInTime + (booking.timer_duration * 60 * 1000)
+    const remaining = endTime - new Date().getTime()
+    const fifteenMinutes = 15 * 60 * 1000
+
+    if (remaining <= 0) return 'red'
+    if (remaining < fifteenMinutes) return 'yellow'
+    return 'green'
+  }
+
+  const getTimerBorderClasses = (booking, isSelected) => {
+    const timerColor = getTimerColor(booking)
+    const baseClasses = isSelected ? 'ring-2 ring-offset-1 ' : ''
+    switch (timerColor) {
+      case 'red': return `${baseClasses}border-rose-400 bg-rose-50 hover:border-rose-500 hover:bg-rose-100`
+      case 'yellow': return `${baseClasses}border-yellow-400 bg-yellow-50 hover:border-yellow-500 hover:bg-yellow-100`
+      case 'green': return `${baseClasses}border-emerald-400 bg-emerald-50 hover:border-emerald-500 hover:bg-emerald-100`
+      default: return `${baseClasses}border-slate-200 hover:border-blue-300 hover:bg-blue-50`
+    }
+  }
 
   function handleExtend() {
     if (extending) return
@@ -147,11 +171,7 @@ function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
                   key={booking.id}
                   type="button"
                   onClick={() => setSelectedBookingId(booking.id)}
-                  className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 ${
-                    selectedBookingId === booking.id
-                      ? 'border-blue-300 bg-blue-50'
-                      : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
+                  className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 ${getTimerBorderClasses(booking, selectedBookingId === booking.id)}`}
                 >
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-slate-800 truncate">{booking.room_number}</span>
@@ -486,7 +506,7 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
   )
 }
 
-export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn, onCheckOut, onUpdate, onDelete, onExtend }) {
+export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn, onCheckOut, onUpdate, onDelete, onExtend, highlightedBookingId, onTimerEnd }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [addOpen, setAddOpen] = useState(false)
@@ -513,10 +533,21 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [expiredTimers, setExpiredTimers] = useState(new Set())
+  const highlightedRowRef = useRef(null)
+
+  // Scroll to highlighted booking when highlightedBookingId changes
+  useEffect(() => {
+    if (highlightedBookingId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightedBookingId])
 
   const handleTimerEnd = (bookingId) => {
     if (!expiredTimers.has(bookingId)) {
       setExpiredTimers(prev => new Set([...prev, bookingId]))
+      
+      // Call parent callback to delete notification
+      if (onTimerEnd) onTimerEnd(bookingId)
       
       // Show browser notification if permission granted
       if (Notification.permission === 'granted') {
@@ -710,7 +741,11 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                 </tr>
               )}
               {filtered.map((booking) => (
-                <tr key={booking.id} className="hover:bg-slate-50 transition-colors">
+                <tr
+                  key={booking.id}
+                  ref={booking.id === highlightedBookingId ? highlightedRowRef : null}
+                  className={`hover:bg-slate-50 transition-all ${booking.id === highlightedBookingId ? 'ring-2 ring-yellow-400 ring-inset shadow-[0_0_15px_rgba(250,204,21,0.5)]' : ''}`}
+                >
                   <td className="w-24 px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
@@ -776,7 +811,11 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
           </div>
         )}
         {filtered.map((booking) => (
-          <div key={booking.id} className="bg-white rounded-xl border border-slate-200 p-4">
+          <div
+            key={booking.id}
+            ref={booking.id === highlightedBookingId ? highlightedRowRef : null}
+            className={`bg-white rounded-xl border border-slate-200 p-4 transition-all ${booking.id === highlightedBookingId ? 'ring-2 ring-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]' : ''}`}
+          >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">

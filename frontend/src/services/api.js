@@ -302,3 +302,41 @@ export const bookingsAPI = {
     })
   }
 }
+
+// Notifications API
+export const notificationsAPI = {
+  getAll: async () => {
+    return apiCall('/notifications')
+  },
+
+  create: async (notificationData) => {
+    return apiCall('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(notificationData)
+    })
+  },
+
+  markAsRead: async (id) => {
+    return apiCall(`/notifications/${id}/read`, {
+      method: 'PATCH'
+    })
+  },
+
+  delete: async (id) => {
+    return apiCall(`/notifications/${id}`, {
+      method: 'DELETE'
+    })
+  },
+
+  deleteAll: async () => {
+    return apiCall('/notifications', {
+      method: 'DELETE'
+    })
+  },
+
+  deleteByBooking: async (bookingId) => {
+    return apiCall(`/notifications/booking/${bookingId}`, {
+      method: 'DELETE'
+    })
+  }
+}

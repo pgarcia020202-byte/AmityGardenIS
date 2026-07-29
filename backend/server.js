@@ -11,6 +11,7 @@ import stockLogRoutes from './routes/stockLogs.js';
 import userRoutes from './routes/users.js';
 import roomRoutes from './routes/rooms.js';
 import bookingRoutes from './routes/bookings.js';
+import notificationRoutes from './routes/notifications.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use('/api/stock-logs', stockLogRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/', (req, res) => {
