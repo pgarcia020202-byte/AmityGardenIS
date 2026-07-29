@@ -13,8 +13,8 @@ function getRangeDays(range) {
 }
 
 function toPhilippinesTime(date) {
-  const phOffset = 8 * 60 * 60 * 1000 // UTC+8
-  return new Date(date.getTime() + phOffset)
+  // Create a new date in Philippines timezone (UTC+8)
+  return new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
 }
 
 function getRangeStart(range) {
