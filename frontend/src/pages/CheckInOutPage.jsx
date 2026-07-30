@@ -546,7 +546,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     if (!expiredTimers.has(bookingId)) {
       setExpiredTimers(prev => new Set([...prev, bookingId]))
       
-      // Call parent callback to delete notification
+      // Call parent callback to update notification
       if (onTimerEnd) onTimerEnd(bookingId)
       
       // Show browser notification if permission granted

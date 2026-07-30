@@ -4,6 +4,14 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper function to emit socket events
+const emitNotificationEvent = (req, event, data) => {
+  const io = req.app.get('io');
+  if (io) {
+    io.emit(event, data);
+  }
+};
+
 // Get all notifications
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -35,6 +43,7 @@ router.post('/', authenticate, async (req, res) => {
 
     // Return the inserted notification or null if it already existed
     if (result.rows.length > 0) {
+      emitNotificationEvent(req, 'notification:created', result.rows[0]);
       res.status(201).json(result.rows[0]);
     } else {
       res.status(200).json({ message: 'Notification already exists' });
@@ -62,6 +71,7 @@ router.patch('/:id/read', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Notification not found' });
     }
 
+    emitNotificationEvent(req, 'notification:updated', result.rows[0]);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -85,6 +95,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Notification not found' });
     }
 
+    emitNotificationEvent(req, 'notification:deleted', { id });
     res.json({ message: 'Notification deleted' });
   } catch (error) {
     console.error('Error deleting notification:', error);
@@ -99,6 +110,7 @@ router.delete('/', authenticate, async (req, res) => {
       `DELETE FROM notifications`
     );
 
+    emitNotificationEvent(req, 'notification:deletedAll', {});
     res.json({ message: 'All notifications deleted' });
   } catch (error) {
     console.error('Error deleting all notifications:', error);
@@ -117,10 +129,37 @@ router.delete('/booking/:bookingId', authenticate, async (req, res) => {
       [bookingId]
     );
 
+    emitNotificationEvent(req, 'notification:deletedByBooking', { bookingId });
     res.json({ message: 'Notifications for booking deleted' });
   } catch (error) {
     console.error('Error deleting booking notifications:', error);
     res.status(500).json({ error: 'Failed to delete booking notifications' });
+  }
+});
+
+// Update notification message for a specific booking
+router.patch('/booking/:bookingId', authenticate, async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { message } = req.body;
+
+    const result = await pool.query(
+      `UPDATE notifications 
+       SET message = $1
+       WHERE booking_id = $2
+       RETURNING *`,
+      [message, bookingId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    emitNotificationEvent(req, 'notification:updated', result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating notification:', error);
+    res.status(500).json({ error: 'Failed to update notification' });
   }
 });
 

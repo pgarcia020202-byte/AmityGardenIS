@@ -338,5 +338,12 @@ export const notificationsAPI = {
     return apiCall(`/notifications/booking/${bookingId}`, {
       method: 'DELETE'
     })
+  },
+
+  updateByBooking: async (bookingId, message) => {
+    return apiCall(`/notifications/booking/${bookingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ message })
+    })
   }
 }

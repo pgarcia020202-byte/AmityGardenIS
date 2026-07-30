@@ -365,6 +365,52 @@ export default function App() {
       setTimeout(() => checkFifteenMinuteWarnings(), 100)
     })
 
+    // Notification realtime events
+    socket.on('notification:created', (notification) => {
+      const formatted = {
+        id: notification.id,
+        bookingId: notification.booking_id,
+        message: notification.message,
+        roomNumber: notification.room_number,
+        time: new Date(notification.created_at).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }),
+        read: notification.read
+      }
+      setNotifications(prev => {
+        // Check if notification already exists to prevent duplicates
+        if (prev.some(n => n.id === notification.id)) {
+          return prev
+        }
+        return [formatted, ...prev]
+      })
+      notifiedBookingIdsRef.current.add(notification.booking_id)
+    })
+
+    socket.on('notification:updated', (notification) => {
+      setNotifications(prev => prev.map(n => 
+        n.id === notification.id 
+          ? { 
+              ...n, 
+              message: notification.message,
+              read: notification.read
+            }
+          : n
+      ))
+    })
+
+    socket.on('notification:deleted', ({ id }) => {
+      setNotifications(prev => prev.filter(n => n.id !== id))
+    })
+
+    socket.on('notification:deletedAll', () => {
+      setNotifications([])
+      notifiedBookingIdsRef.current.clear()
+    })
+
+    socket.on('notification:deletedByBooking', ({ bookingId }) => {
+      setNotifications(prev => prev.filter(n => n.bookingId !== bookingId))
+      notifiedBookingIdsRef.current.delete(bookingId)
+    })
+
     return () => {
       socket.off()
       socket.disconnect()
@@ -379,7 +425,7 @@ export default function App() {
     const now = new Date().getTime()
     const fifteenMinutes = 15 * 60 * 1000
 
-    // Check for expired bookings and clear their notifications
+    // Check for expired bookings and update their notifications
     const expiredBookings = bookingsRef.current
       .filter(b => b.status === 'Checked In' && b.check_in_date && b.timer_duration)
       .filter(b => {
@@ -392,11 +438,10 @@ export default function App() {
     for (const booking of expiredBookings) {
       if (notifiedBookingIdsRef.current.has(booking.id)) {
         try {
-          await notificationsAPI.deleteByBooking(booking.id)
-          notifiedBookingIdsRef.current.delete(booking.id)
-          setNotifications(prev => prev.filter(n => n.bookingId !== booking.id))
+          // Update the notification message to "Remaining Time is up" - socket event will handle local state update
+          await notificationsAPI.updateByBooking(booking.id, 'Remaining Time is up')
         } catch (error) {
-          console.error('Error deleting expired notification:', error)
+          console.error('Error updating expired notification:', error)
         }
       }
     }
@@ -420,12 +465,12 @@ export default function App() {
       }))
 
     if (newWarnings.length > 0) {
-      // Add new booking IDs to the notified set
+      // Add new booking IDs to the notified set BEFORE API call to prevent duplicates
       newWarnings.forEach(warning => {
         notifiedBookingIdsRef.current.add(warning.bookingId)
       })
       
-      // Save notifications to database
+      // Save notifications to database - socket event will handle local state update
       for (const warning of newWarnings) {
         try {
           await notificationsAPI.create({
@@ -435,10 +480,10 @@ export default function App() {
           })
         } catch (error) {
           console.error('Error saving notification to database:', error)
+          // If API fails, remove from notified set so it can be retried
+          notifiedBookingIdsRef.current.delete(warning.bookingId)
         }
       }
-      
-      setNotifications(prev => [...newWarnings, ...prev])
 
       // Show browser notification if permission granted
       if (Notification.permission === 'granted') {
@@ -776,11 +821,19 @@ export default function App() {
 
   async function handleTimerEnd(bookingId) {
     try {
-      await notificationsAPI.deleteByBooking(bookingId)
-      notifiedBookingIdsRef.current.delete(bookingId)
-      setNotifications(prev => prev.filter(n => n.bookingId !== bookingId))
+      // Check if notification exists for this booking in current state
+      const existingNotification = notifications.find(n => n.bookingId === bookingId)
+      
+      if (existingNotification) {
+        // Update existing notification - socket event will handle local state update
+        await notificationsAPI.updateByBooking(bookingId, 'Remaining Time is up')
+      }
+      // If notification doesn't exist (user may have dismissed it), don't recreate it
     } catch (error) {
-      console.error('Error deleting notification on timer end:', error)
+      // If update fails (e.g., notification was deleted), don't update local state
+      if (!error.message?.includes('Notification not found')) {
+        console.error('Error handling timer end notification:', error)
+      }
     }
   }
 
