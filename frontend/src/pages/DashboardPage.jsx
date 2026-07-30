@@ -27,7 +27,12 @@ function formatCurrency(n) {
 }
 
 function relTime(iso) {
-  const diff = Date.now() - new Date(iso).getTime()
+  const date = new Date(iso)
+  // Convert to Asia/Manila timezone for accurate relative time
+  const manilaDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+  const now = new Date()
+  const nowManila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+  const diff = nowManila.getTime() - manilaDate.getTime()
   const m = Math.floor(diff / 60000)
   if (m < 1) return 'just now'
   if (m < 60) return `${m}m ago`
@@ -55,9 +60,9 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
     .filter(b => {
       const d = new Date(b.check_in_date)
       const now = new Date()
-      const phOffset = 8 * 60 * 60 * 1000
-      const dPH = new Date(d.getTime() + phOffset)
-      const nowPH = new Date(now.getTime() + phOffset)
+      // Convert to Philippines timezone using proper timezone conversion
+      const dPH = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+      const nowPH = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
       return dPH.toDateString() === nowPH.toDateString()
     })
     .reduce((s, b) => s + parseFloat(b.price || 0), 0)
@@ -68,10 +73,9 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
   const todaySales = sales.filter(s => {
     const d = new Date(s.date)
     const now = new Date()
-    // Convert to Philippines timezone (Asia/Manila, UTC+8)
-    const phOffset = 8 * 60 * 60 * 1000 // 8 hours in milliseconds
-    const dPH = new Date(d.getTime() + phOffset)
-    const nowPH = new Date(now.getTime() + phOffset)
+    // Convert to Philippines timezone using proper timezone conversion
+    const dPH = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+    const nowPH = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
     return dPH.toDateString() === nowPH.toDateString()
   })
   const todayRevenue = todaySales.reduce((s, sale) => s + parseFloat(sale.total || 0), 0)

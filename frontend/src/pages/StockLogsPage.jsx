@@ -66,17 +66,27 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
   }, [search, typeFilter, startDate, endDate])
 
   function formatDate(iso) {
-    return new Date(iso).toLocaleString('en-PH', {
+    const date = new Date(iso)
+    // Convert to Asia/Manila timezone (UTC+8)
+    const options = {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    })
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Manila'
+    }
+    return date.toLocaleString('en-PH', options)
   }
 
   function relTime(iso) {
-    const diff = Date.now() - new Date(iso).getTime()
+    const date = new Date(iso)
+    // Convert to Asia/Manila timezone for accurate relative time
+    const manilaDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+    const now = new Date()
+    const nowManila = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+    const diff = nowManila.getTime() - manilaDate.getTime()
     const m = Math.floor(diff / 60000)
     if (m < 1) return 'just now'
     if (m < 60) return `${m}m ago`
