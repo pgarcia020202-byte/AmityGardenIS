@@ -41,12 +41,12 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
         style={{ background: '#000000' }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
-          <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+        <div className={`flex items-center gap-3 border-b border-gray-800 relative ${sidebarCollapsed && !mobile ? 'justify-center px-0 py-4' : 'px-6 py-5'}`}>
+          <img src="/logo.png" alt="Logo" className={`rounded-lg object-cover shrink-0 ${sidebarCollapsed && !mobile ? 'w-8 h-8' : 'w-10 h-10'}`} />
           {showText && (
             <div>
               <p className="text-white font-semibold text-sm leading-tight">Amity Garden Resort and Hotel</p>
-              <p className="text-slate-500 text-xs">Inventory System</p>
+              
             </div>
           )}
           {mobile && (
@@ -55,18 +55,21 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
             </button>
           )}
           {!mobile && (
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="ml-auto text-slate-400 hover:text-white">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className={`text-slate-400 hover:text-white transition-colors ${sidebarCollapsed ? 'absolute right-2' : 'ml-auto'}`}
+            >
               <ChevronRight size={18} className={`transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} />
             </button>
           )}
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className={`flex-1 space-y-0.5 overflow-y-auto ${sidebarCollapsed && !mobile ? 'px-2 py-4' : 'px-3 py-4'}`}>
           {visibleNav.map((item, index) => {
             if (item.header) {
               return (
-                <div key={`header-${index}`} className="px-3 py-2 mt-4">
+                <div key={`header-${index}`} className={`${sidebarCollapsed && !mobile ? 'hidden' : 'px-3 py-2 mt-4'}`}>
                   {showText && (
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       {item.header}
@@ -80,7 +83,9 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
               <button
                 key={item.page}
                 onClick={() => { onNavigate(item.page); setSidebarOpen(false) }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left group ${
+                className={`w-full flex items-center rounded-lg text-sm font-medium transition-all text-left group ${
+                  sidebarCollapsed && !mobile ? 'justify-center px-0 py-3' : 'gap-3 px-3 py-2.5'
+                } ${
                   active
                     ? 'bg-slate-800 text-white'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
@@ -102,10 +107,10 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
         </nav>
 
         {/* User */}
-        <div className="px-3 py-4 border-t border-gray-800">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-900">
-            <div className="w-7 h-7 rounded-full bg-gray-500 flex items-center justify-center shrink-0">
-              <UserIcon size={13} className="text-white" />
+        <div className={`border-t border-gray-800 ${sidebarCollapsed && !mobile ? 'px-2 py-4' : 'px-3 py-4'}`}>
+          <div className={`flex items-center rounded-lg bg-gray-900 ${sidebarCollapsed && !mobile ? 'justify-center px-0 py-3' : 'gap-3 px-3 py-2'}`}>
+            <div className={`rounded-full bg-gray-500 flex items-center justify-center shrink-0 ${sidebarCollapsed && !mobile ? 'w-8 h-8' : 'w-7 h-7'}`}>
+              <UserIcon size={sidebarCollapsed && !mobile ? 14 : 13} className="text-white" />
             </div>
             {showText && (
               <div className="flex-1 min-w-0">
@@ -118,14 +123,25 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
                 </div>
               </div>
             )}
+            {!sidebarCollapsed && (
+              <button
+                onClick={onLogout}
+                className="text-slate-500 hover:text-rose-400 transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={15} />
+              </button>
+            )}
+          </div>
+          {sidebarCollapsed && !mobile && (
             <button
               onClick={onLogout}
-              className="text-slate-500 hover:text-rose-400 transition-colors"
+              className="w-full flex items-center justify-center mt-2 text-slate-500 hover:text-rose-400 transition-colors py-2"
               title="Sign out"
             >
-              <LogOut size={15} />
+              <LogOut size={16} />
             </button>
-          </div>
+          )}
         </div>
       </aside>
     )
