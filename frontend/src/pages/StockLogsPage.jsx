@@ -357,6 +357,15 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
               <Clock size={11} className="text-slate-400 shrink-0" />
               <p className="text-xs text-slate-400">{formatDate(log.date)} · {relTime(log.date)}</p>
             </div>
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => handleDeleteClick(log.id)}
+                className="mt-3 w-full flex items-center justify-center gap-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                <Trash2 size={14} />
+                Delete Log
+              </button>
+            )}
           </div>
         ))}
       </div>

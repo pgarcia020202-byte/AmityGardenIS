@@ -215,6 +215,15 @@ export default function App() {
       }
     }
 
+    socket.on('category:created', (category) => {
+      const id = normalizeId(category.id)
+      setCategories((prev) => {
+        if (prev.some((item) => normalizeId(item.id) === id)) {
+          return prev
+        }
+        return [...prev, category]
+      })
+    })
     socket.on('category:updated', (category) => {
       const id = normalizeId(category.id)
       setCategories((prev) => prev.map((item) => (normalizeId(item.id) === id ? category : item)))
@@ -591,7 +600,13 @@ export default function App() {
 
   async function handleAddCategory(name) {
     const newCategory = await categoryAPI.create(name)
-    setCategories((prev) => [...prev, newCategory])
+    const newCategoryId = normalizeId(newCategory.id)
+    setCategories((prev) => {
+      if (prev.some((entry) => normalizeId(entry.id) === newCategoryId)) {
+        return prev
+      }
+      return [...prev, newCategory]
+    })
   }
 
   async function handleEditCategory(id, name) {
