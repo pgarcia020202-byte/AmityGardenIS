@@ -278,7 +278,8 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
                 Manage products →
               </button>
             </div>
-            <div className="p-3 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+            <div className="p-3 sm:p-5">
+              <div className="max-h-60 sm:max-h-none overflow-y-auto sm:overflow-visible grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {products
                 .filter(p => getProductStatus(p) !== 'In Stock')
                 .sort((a, b) => a.current_stock - b.current_stock)
@@ -301,6 +302,7 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
                     </div>
                   )
                 })}
+              </div>
             </div>
           </div>
         )}
