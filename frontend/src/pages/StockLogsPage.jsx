@@ -255,54 +255,56 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
-        <div>
-          <p className="text-sm text-slate-500 mt-0.5">{stockLogs.length} entries total</p>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search logs…"
-              className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full sm:w-52"
-            />
+      <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <p className="text-sm text-slate-500 mt-0.5">{stockLogs.length} entries total</p>
           </div>
-          <div className="flex gap-3">
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value)}
-              className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            >
-              <option value="all">All Types</option>
-              <option value="Stock In">Stock In</option>
-              <option value="Sale">Sale</option>
-              <option value="Adjustment">Adjustment</option>
-            </select>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search logs…"
+                  className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full sm:w-52"
+                />
+              </div>
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              >
+                <option value="all">All Types</option>
+                <option value="Stock In">Stock In</option>
+                <option value="Sale">Sale</option>
+                <option value="Adjustment">Adjustment</option>
+              </select>
+            </div>
+            <div className="flex flex-row gap-1">
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              />
+              <button
+                onClick={handleExportPDF}
+                className="group flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
+              >
+                <Download size={16} /> <span className="hidden sm:inline">Export PDF</span>
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => setEndDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            />
-          </div>
-          <button
-            onClick={handleExportPDF}
-            className="group flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200"
-          >
-            <Download size={16} /> Export PDF
-          </button>
         </div>
       </div>
 

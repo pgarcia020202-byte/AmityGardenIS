@@ -100,7 +100,7 @@ function useIsMobile() {
 
 export default function Reports({ products, sales, categories, rooms, bookings }) {
   const [timeRange, setTimeRange] = useState('today')
-  const [activeTab, setActiveTab] = useState('store')
+  const [activeTab, setActiveTab] = useState('inventory')
   const isMobile = useIsMobile()
 
   const rangeDays = getRangeDays(timeRange)
@@ -358,95 +358,98 @@ export default function Reports({ products, sales, categories, rooms, bookings }
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Tab Switcher */}
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('store')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-            activeTab === 'store'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Store Reports
-        </button>
-        <button
-          onClick={() => setActiveTab('hotel')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-            activeTab === 'hotel'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          Hotel Reports
-        </button>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <p className="text-sm text-slate-500 mt-0.5">Analytics and insights</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <select
-            value={timeRange}
-            onChange={e => setTimeRange(e.target.value)}
-            className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+      {/* Tab Switcher and Filter - Sticky */}
+      <div className="sticky top-0 z-10 bg-white px-4 pb-4 space-y-4 shadow-md -mx-4 sm:mx-0">
+        {/* Tab Switcher */}
+        <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('inventory')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+              activeTab === 'inventory'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="thisMonth">This Month</option>
-            <option value="lastMonth">Last Month</option>
-            <option value="thisYear">This Year</option>
-          </select>
+            Inventory
+          </button>
+          <button
+            onClick={() => setActiveTab('hotel')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
+              activeTab === 'hotel'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Hotel
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <p className="text-sm text-slate-500 mt-0.5">Analytics and insights</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              value={timeRange}
+              onChange={e => setTimeRange(e.target.value)}
+              className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="thisMonth">This Month</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="thisYear">This Year</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {activeTab === 'store' ? (
+      {activeTab === 'inventory' ? (
         <div className="space-y-4 sm:space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-yellow-50 flex items-center justify-center shrink-0">
-                  <TrendingUp size={18} className="text-yellow-600" />
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-yellow-50 flex items-center justify-center shrink-0">
+                  <TrendingUp size={16} className="text-yellow-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(totalRevenue)}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(totalRevenue)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                  <ShoppingBag size={18} className="text-violet-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+                  <ShoppingBag size={16} className="text-violet-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Products Sold</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Products Sold</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{totalUnitsSold.toLocaleString()}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{totalUnitsSold.toLocaleString()}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
-                  <Package size={18} className="text-sky-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
+                  <Package size={16} className="text-sky-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Stock Value</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Stock Value</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(totalStockValue)}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(totalStockValue)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                  <Calendar size={18} className="text-amber-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <Calendar size={16} className="text-amber-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Transactions</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Transactions</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{filteredSales.length}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{filteredSales.length}</p>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">
                 {timeRange === 'today' && 'Sales Trend (Today)'}
                 {timeRange === 'yesterday' && 'Sales Trend (Yesterday)'}
                 {timeRange === '7d' && 'Sales Trend (Last 7 Days)'}
@@ -455,42 +458,42 @@ export default function Reports({ products, sales, categories, rooms, bookings }
                 {timeRange === 'lastMonth' && 'Sales Trend (Last Month)'}
                 {timeRange === 'thisYear' && 'Sales Trend (This Year)'}
               </h3>
-              <ResponsiveContainer width="100%" height={isMobile ? 220 : 250}>
-                <LineChart data={salesOverTime} margin={isMobile ? { left: -20, right: 5 } : undefined}>
+              <ResponsiveContainer width="100%" height={isMobile ? 280 : 250}>
+                <LineChart data={salesOverTime} margin={isMobile ? { left: -10, right: 5, top: 5, bottom: 5 } : undefined}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     dataKey="date"
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={isMobile ? 10 : 11}
                     tickLine={false}
                     axisLine={false}
                     interval={
-                      timeRange === 'today' || timeRange === 'yesterday' ? (isMobile ? 5 : 3) :
+                      timeRange === 'today' || timeRange === 'yesterday' ? (isMobile ? 4 : 3) :
                       timeRange === '30d' ? 4 :
                       timeRange === 'thisMonth' || timeRange === 'lastMonth' ? 0 :
                       timeRange === 'thisYear' ? 0 :
-                      isMobile ? Math.ceil(salesOverTime.length / 4) - 1 : 0
+                      isMobile ? Math.ceil(salesOverTime.length / 3) - 1 : 0
                     }
                   />
                   <YAxis
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={isMobile ? 10 : 11}
                     tickLine={false}
                     axisLine={false}
-                    width={isMobile ? 40 : 60}
-                    tickFormatter={value => isMobile ? Math.round(value / 1000) + 'k' : '₱' + value}
+                    width={isMobile ? 45 : 60}
+                    tickFormatter={value => isMobile ? (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : '₱' + value) : '₱' + value}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value) => [formatCurrency(Number(value) || 0), 'Revenue']}
                   />
-                  <Line type="monotone" dataKey="sales" stroke="#eab308" strokeWidth={2} dot={{ fill: '#eab308', strokeWidth: 2, r: 4 }} />
+                  <Line type="monotone" dataKey="sales" stroke="#eab308" strokeWidth={isMobile ? 2 : 2} dot={{ fill: '#eab308', strokeWidth: 2, r: isMobile ? 3 : 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">Sales by Category</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Sales by Category</h3>
               {salesByCategory.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-16">No sales in this period</p>
               ) : (
@@ -523,24 +526,25 @@ export default function Reports({ products, sales, categories, rooms, bookings }
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Top Selling Products</h3>
+          <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+            <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Top Selling Products</h3>
             {topProducts.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-16">No product sales in this period</p>
             ) : (
-              <ResponsiveContainer width="100%" height={isMobile ? 150 : 170}>
-                <BarChart data={topProducts} layout="vertical" margin={isMobile ? { left: -10 } : undefined}>
+              <ResponsiveContainer width="100%" height={isMobile ? 200 : 170}>
+                <BarChart data={topProducts} layout="vertical" margin={isMobile ? { left: 1 } : undefined}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
                   <XAxis type="number" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis
                     dataKey="name"
                     type="category"
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={isMobile ? 10 : 11}
                     tickLine={false}
                     axisLine={false}
-                    width={isMobile ? 76 : 120}
-                    tickFormatter={value => truncateLabel(value, isMobile ? 10 : 18)}
+                    width={isMobile ? 90 : 120}
+                    tickFormatter={value => truncateLabel(value, isMobile ? 12 : 18)}
+                    interval={0}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -556,15 +560,15 @@ export default function Reports({ products, sales, categories, rooms, bookings }
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Stock Status Distribution</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+            <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Stock Status Distribution</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
               {stockStatus.map(status => (
-                <div key={status.name} className="border border-slate-200 rounded-lg p-4">
+                <div key={status.name} className="border border-slate-200 rounded-lg p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">{status.name}</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700">{status.name}</span>
                     <div
-                      className={`w-3 h-3 rounded-full shrink-0 ${
+                      className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 ${
                         status.name === 'In Stock'
                           ? 'bg-yellow-500'
                           : status.name === 'Low Stock'
@@ -573,8 +577,8 @@ export default function Reports({ products, sales, categories, rooms, bookings }
                       }`}
                     />
                   </div>
-                  <p className="text-2xl font-bold text-slate-900 font-mono">{status.value}</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">{status.value}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1">
                     {products.length > 0 ? ((status.value / products.length) * 100).toFixed(1) : '0.0'}% of total
                   </p>
                 </div>
@@ -585,48 +589,48 @@ export default function Reports({ products, sales, categories, rooms, bookings }
       ) : (
         <div className="space-y-4 sm:space-y-6">
           {/* Hotel Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
-                  <TrendingUp size={18} className="text-sky-600" />
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
+                  <TrendingUp size={16} className="text-sky-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Total Revenue</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(hotelTotalRevenue)}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(hotelTotalRevenue)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                  <Calendar size={18} className="text-violet-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+                  <Calendar size={16} className="text-violet-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Bookings</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Total Bookings</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{hotelTotalBookings}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{hotelTotalBookings}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                  <Users size={18} className="text-emerald-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                  <Users size={16} className="text-emerald-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Revenue</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Avg Revenue</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(hotelAvgRevenue)}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{formatCurrency(hotelAvgRevenue)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <div className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                  <Bed size={18} className="text-amber-600" />
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <Bed size={16} className="text-amber-600" />
                 </div>
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Rooms</span>
+                <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide">Total Rooms</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-slate-900 font-mono truncate">{rooms.length}</p>
+              <p className="text-base sm:text-2xl font-bold text-slate-900 font-mono truncate">{rooms.length}</p>
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">
                 {timeRange === 'today' && 'Bookings Trend (Today)'}
                 {timeRange === 'yesterday' && 'Bookings Trend (Yesterday)'}
                 {timeRange === '7d' && 'Bookings Trend (Last 7 Days)'}
@@ -635,41 +639,41 @@ export default function Reports({ products, sales, categories, rooms, bookings }
                 {timeRange === 'lastMonth' && 'Bookings Trend (Last Month)'}
                 {timeRange === 'thisYear' && 'Bookings Trend (This Year)'}
               </h3>
-              <ResponsiveContainer width="100%" height={isMobile ? 220 : 250}>
-                <LineChart data={bookingsOverTime} margin={isMobile ? { left: -20, right: 5 } : undefined}>
+              <ResponsiveContainer width="100%" height={isMobile ? 280 : 250}>
+                <LineChart data={bookingsOverTime} margin={isMobile ? { left: -10, right: 5, top: 5, bottom: 5 } : undefined}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     dataKey="date"
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={isMobile ? 10 : 11}
                     tickLine={false}
                     axisLine={false}
                     interval={
-                      timeRange === 'today' || timeRange === 'yesterday' ? (isMobile ? 5 : 3) :
+                      timeRange === 'today' || timeRange === 'yesterday' ? (isMobile ? 4 : 3) :
                       timeRange === '30d' ? 4 :
                       timeRange === 'thisMonth' || timeRange === 'lastMonth' ? 0 :
                       timeRange === 'thisYear' ? 0 :
-                      isMobile ? Math.ceil(bookingsOverTime.length / 4) - 1 : 0
+                      isMobile ? Math.ceil(bookingsOverTime.length / 3) - 1 : 0
                     }
                   />
                   <YAxis
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={isMobile ? 10 : 11}
                     tickLine={false}
                     axisLine={false}
-                    width={isMobile ? 40 : 60}
+                    width={isMobile ? 45 : 60}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value, name) => [name === 'bookings' ? value : formatCurrency(Number(value) || 0), name === 'bookings' ? 'Bookings' : 'Revenue']}
                   />
-                  <Line type="monotone" dataKey="bookings" stroke="#0ea5e9" strokeWidth={2} dot={{ fill: '#0ea5e9', strokeWidth: 2, r: 4 }} />
+                  <Line type="monotone" dataKey="bookings" stroke="#0ea5e9" strokeWidth={isMobile ? 2 : 2} dot={{ fill: '#0ea5e9', strokeWidth: 2, r: isMobile ? 3 : 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">Bookings by Room Type</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+              <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Bookings by Room Type</h3>
               {bookingsByRoomType.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-16">No bookings</p>
               ) : (
@@ -702,15 +706,15 @@ export default function Reports({ products, sales, categories, rooms, bookings }
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Room Status Distribution</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-3 sm:p-5">
+            <h3 className="text-xs sm:text-sm font-semibold text-slate-900 mb-3 sm:mb-4">Room Status Distribution</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
               {roomStatus.map(status => (
-                <div key={status.name} className="border border-slate-200 rounded-lg p-4">
+                <div key={status.name} className="border border-slate-200 rounded-lg p-3 sm:p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-slate-700">{status.name}</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700">{status.name}</span>
                     <div
-                      className={`w-3 h-3 rounded-full shrink-0 ${
+                      className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shrink-0 ${
                         status.name === 'Available'
                           ? 'bg-emerald-500'
                           : status.name === 'Occupied'
@@ -721,8 +725,8 @@ export default function Reports({ products, sales, categories, rooms, bookings }
                       }`}
                     />
                   </div>
-                  <p className="text-2xl font-bold text-slate-900 font-mono">{status.value}</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">{status.value}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1">
                     {rooms.length > 0 ? ((status.value / rooms.length) * 100).toFixed(1) : '0.0'}% of total
                   </p>
                 </div>

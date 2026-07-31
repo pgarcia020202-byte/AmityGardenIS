@@ -151,50 +151,56 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-6">
-        <div>
-          <p className="text-sm text-slate-500 mt-0.5">{rooms.length} rooms total</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search rooms…"
-              className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full sm:w-52"
-            />
+      <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div>
+            <p className="text-sm text-slate-500 mt-0.5">{rooms.length} rooms total</p>
           </div>
-          <select
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value)}
-            className="px-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-          >
-            <option value="All">All Types</option>
-            <option value="Standard">Standard</option>
-            <option value="Family">Family</option>
-            <option value="Barkada">Barkada</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="px-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-          >
-            <option value="All">All Status</option>
-            <option value="Available">Available</option>
-            <option value="Occupied">Occupied</option>
-            <option value="Reserved">Reserved</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Cleaning">Cleaning</option>
-          </select>
-          {canManage && (
-            <button
-              onClick={() => { setFormData({ room_number: '', room_type: 'Standard', capacity: 2, status: 'Available', floor_number: 1 }); setError(''); setAddOpen(true) }}
-              className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
-            >
-              <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> Add Room
-            </button>
-          )}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-row gap-3">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search rooms…"
+                  className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full sm:w-52"
+                />
+              </div>
+              {canManage && (
+                <button
+                  onClick={() => { setFormData({ room_number: '', room_type: 'Standard', capacity: 2, status: 'Available', floor_number: 1 }); setError(''); setAddOpen(true) }}
+                  className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
+                >
+                  <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> Add Room
+                </button>
+              )}
+            </div>
+            <div className="flex flex-row gap-3">
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="flex-1 px-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              >
+                <option value="All">All Types</option>
+                <option value="Standard">Standard</option>
+                <option value="Family">Family</option>
+                <option value="Barkada">Barkada</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="flex-1 px-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              >
+                <option value="All">All Status</option>
+                <option value="Available">Available</option>
+                <option value="Occupied">Occupied</option>
+                <option value="Reserved">Reserved</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Cleaning">Cleaning</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
