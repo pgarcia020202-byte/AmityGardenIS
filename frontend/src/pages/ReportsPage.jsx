@@ -358,6 +358,14 @@ export default function Reports({ products, sales, categories, rooms, bookings }
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <style>{`
+      .recharts-wrapper:focus,
+      .recharts-wrapper *:focus,
+      .recharts-surface:focus,
+      .recharts-surface *:focus {
+        outline: none !important;
+      }
+    `}</style>
       {/* Tab Switcher and Filter - Sticky */}
       <div className="sticky top-0 z-10 bg-white px-4 pb-4 space-y-4 shadow-md -mx-4 sm:mx-0">
         {/* Tab Switcher */}
