@@ -12,6 +12,7 @@ import userRoutes from './routes/users.js';
 import roomRoutes from './routes/rooms.js';
 import bookingRoutes from './routes/bookings.js';
 import notificationRoutes from './routes/notifications.js';
+import expenseRoutes from './routes/expenses.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Health check
 app.get('/', (req, res) => {

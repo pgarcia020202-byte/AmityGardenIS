@@ -11,6 +11,7 @@ import ReportsPage from './pages/ReportsPage'
 import UsersPage from './pages/UsersPage'
 import RoomsPage from './pages/RoomsPage'
 import CheckInOutPage from './pages/CheckInOutPage'
+import StaffExpensesPage from './pages/StaffExpensesPage'
 import {
   authAPI,
   categoryAPI,
@@ -20,7 +21,8 @@ import {
   usersAPI,
   roomsAPI,
   bookingsAPI,
-  notificationsAPI
+  notificationsAPI,
+  expensesAPI
 } from './services/api'
 
 export default function App() {
@@ -56,6 +58,7 @@ export default function App() {
   const [rooms, setRooms] = useState([])
   const [bookings, setBookings] = useState([])
   const [notifications, setNotifications] = useState([])
+  const [expenses, setExpenses] = useState([])
   const [highlightedBookingId, setHighlightedBookingId] = useState(null)
   const [loading, setLoading] = useState(true)
   const socketRef = useRef(null)
@@ -90,10 +93,11 @@ export default function App() {
         salesAPI.getAll(),
         stockLogsAPI.getAll(),
         roomsAPI.getAll(),
-        bookingsAPI.getAll()
+        bookingsAPI.getAll(),
+        expensesAPI.getAll()
       ])
 
-      const [categoriesResult, productsResult, salesResult, logsResult, roomsResult, bookingsResult] = results
+      const [categoriesResult, productsResult, salesResult, logsResult, roomsResult, bookingsResult, expensesResult] = results
 
       const handleRejected = (result, name) => {
         if (!result || result.status !== 'rejected') return
@@ -145,6 +149,13 @@ export default function App() {
       if (bookingsResult.status === 'fulfilled') {
         setBookings(bookingsResult.value)
       } else if (handleRejected(bookingsResult, 'bookings')) {
+        setLoading(false)
+        return
+      }
+
+      if (expensesResult.status === 'fulfilled') {
+        setExpenses(expensesResult.value)
+      } else if (handleRejected(expensesResult, 'expenses')) {
         setLoading(false)
         return
       }
@@ -418,6 +429,26 @@ export default function App() {
     socket.on('notification:deletedByBooking', ({ bookingId }) => {
       setNotifications(prev => prev.filter(n => n.bookingId !== bookingId))
       notifiedBookingIdsRef.current.delete(bookingId)
+    })
+
+    socket.on('expense:created', (expense) => {
+      const id = normalizeId(expense.id)
+      setExpenses((prev) => {
+        if (prev.some((item) => normalizeId(item.id) === id)) return prev
+        return [expense, ...prev]
+      })
+    })
+    socket.on('expense:updated', (expense) => {
+      const id = normalizeId(expense.id)
+      setExpenses((prev) => {
+        const exists = prev.some((item) => normalizeId(item.id) === id)
+        const updated = prev.map((item) => (normalizeId(item.id) === id ? expense : item))
+        return exists ? updated : [...updated, expense]
+      })
+    })
+    socket.on('expense:deleted', (id) => {
+      const normalizedId = normalizeId(id)
+      setExpenses((prev) => prev.filter((item) => normalizeId(item.id) !== normalizedId))
     })
 
     return () => {
@@ -838,7 +869,7 @@ export default function App() {
     try {
       // Check if notification exists for this booking in current state
       const existingNotification = notifications.find(n => n.bookingId === bookingId)
-      
+
       if (existingNotification) {
         // Update existing notification - socket event will handle local state update
         await notificationsAPI.updateByBooking(bookingId, 'Remaining Time is up')
@@ -850,6 +881,29 @@ export default function App() {
         console.error('Error handling timer end notification:', error)
       }
     }
+  }
+
+  async function handleAddExpense(expense) {
+    const newExpense = await expensesAPI.create(expense)
+    const newExpenseId = normalizeId(newExpense.id)
+    setExpenses((prev) => {
+      if (prev.some((entry) => normalizeId(entry.id) === newExpenseId)) {
+        return prev
+      }
+      return [...prev, newExpense]
+    })
+  }
+
+  async function handleEditExpense(id, expense) {
+    await expensesAPI.update(id, expense)
+    const normalizedId = normalizeId(id)
+    setExpenses((prev) => prev.map((entry) => (normalizeId(entry.id) === normalizedId ? { ...entry, ...expense } : entry)))
+  }
+
+  async function handleDeleteExpense(id) {
+    await expensesAPI.delete(id)
+    const normalizedId = normalizeId(id)
+    setExpenses((prev) => prev.filter((entry) => normalizeId(entry.id) !== normalizedId))
   }
 
   if (!currentUser) {
@@ -876,6 +930,8 @@ export default function App() {
         return <RoomsPage rooms={rooms} currentUser={currentUser} onAdd={handleAddRoom} onEdit={handleEditRoom} onDelete={handleDeleteRoom} />
       case 'check-in-out':
         return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} onExtend={handleExtendBooking} highlightedBookingId={highlightedBookingId} onTimerEnd={handleTimerEnd} />
+      case 'staff-expenses':
+        return <StaffExpensesPage expenses={expenses} products={products} categories={categories} currentUser={currentUser} onAdd={handleAddExpense} onEdit={handleEditExpense} onDelete={handleDeleteExpense} />
       default:
         return null
     }

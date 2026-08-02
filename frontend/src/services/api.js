@@ -347,3 +347,30 @@ export const notificationsAPI = {
     })
   }
 }
+
+// Expenses API
+export const expensesAPI = {
+  getAll: async () => {
+    return apiCall('/expenses')
+  },
+
+  create: async (expenseData) => {
+    return apiCall('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(expenseData)
+    })
+  },
+
+  update: async (id, expenseData) => {
+    return apiCall(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(expenseData)
+    })
+  },
+
+  delete: async (id) => {
+    return apiCall(`/expenses/${id}`, {
+      method: 'DELETE'
+    })
+  }
+}

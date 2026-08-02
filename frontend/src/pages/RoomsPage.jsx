@@ -253,7 +253,6 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="w-16 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
                 <th className="w-32 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
                 <th className="w-28 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
                 <th className="w-28 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Capacity</th>
@@ -265,14 +264,13 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
                     {search ? 'No rooms match your search.' : 'No rooms yet.'}
                   </td>
                 </tr>
               )}
-              {filtered.map((room, i) => (
+              {filtered.map((room) => (
                 <tr key={room.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="w-16 px-4 py-3.5 text-xs text-slate-400 font-mono">{i + 1}</td>
                   <td className="w-32 px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">

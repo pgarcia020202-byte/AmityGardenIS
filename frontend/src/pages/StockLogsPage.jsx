@@ -376,7 +376,6 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Product</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
@@ -391,14 +390,13 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={currentUser?.role === 'admin' ? 8 : 7} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={currentUser?.role === 'admin' ? 7 : 6} className="px-5 py-12 text-center text-sm text-slate-400">
                     {search || typeFilter !== 'all' ? 'No logs match your filters.' : 'No stock activity yet.'}
                   </td>
                 </tr>
               )}
-              {paginated.map((log, i) => (
+              {paginated.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <Clock size={13} className="text-slate-400" />

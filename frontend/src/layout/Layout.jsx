@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Tag, Package, ShoppingBag,
-  ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon, Building, Bed, LogIn
+  ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon, Building, Bed, LogIn, DollarSign
 } from 'lucide-react'
 import NotificationMenu from '../components/NotificationMenu'
 
@@ -15,6 +15,8 @@ const NAV_ITEMS = [
   { header: 'Hotel Management' },
   { page: 'rooms', label: 'Rooms', icon: <Bed size={18} /> },
   { page: 'check-in-out', label: 'Check In/Out', icon: <LogIn size={18} /> },
+  { header: 'Finance' },
+  { page: 'staff-expenses', label: 'Staff Expenses', icon: <DollarSign size={18} /> },
   { header: ' ' },
   { page: 'reports', label: 'Reports', icon: <BarChart3 size={18} />, adminOnly: true },
   { page: 'users', label: 'User Management', icon: <UserIcon size={18} />, adminOnly: true },
@@ -174,7 +176,7 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
           </button>
           <div>
             <h1 className="text-sm font-semibold text-slate-900 capitalize">
-              {currentPage === 'users' ? 'User Management' : currentPage.replace('-', ' ')}
+              {currentPage === 'users' ? 'User Management' : currentPage === 'staff-expenses' ? 'Staff Expenses' : currentPage.replace('-', ' ')}
             </h1>
             <p className="text-xs text-slate-400 hidden sm:block">
               {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}

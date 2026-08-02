@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Clock, X, Check, AlertCircle, Eye, Download } from 'lucide-react'
+import { Plus, Search, Clock, X, Check, AlertCircle, Eye, Download, Calendar, User } from 'lucide-react'
 import jsPDF from 'jspdf'
 
 function formatCurrency(n) {
@@ -64,17 +64,7 @@ function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm,
   )
 }
 
-// Sale details / admin edit modal. Kept as a standalone component (not nested
-// inside Sales) so React preserves its identity across Sales re-renders —
-// previously this was defined inline inside Sales, which meant every re-render
-// (e.g. from a socket update touching products/sales) redefined the function
-// and made React unmount+remount the modal, silently wiping out any qty edits
-// the admin was mid-way through.
-function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, onDelete }) {
-  // Keep originalQty so we can calculate how much more can be added on top of
-  // the quantity already reserved by this sale. product.current_stock is
-  // assumed to be the live stock (after the sale was created), so allowed max
-  // = current_stock + originalQty.
+function ExpenseDetailsModal({ viewTarget, products, currentUser, onClose, onSave, onDelete }) {
   const [items, setItems] = useState(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -113,16 +103,16 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
 
   const total = items.reduce((sum, it) => sum + ((it.unitPrice || 0) * it.qty), 0)
 
-  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'staff'
+  const canEdit = currentUser?.role === 'admin'
   
-  // Check if sale is older than 12 hours (real-time)
+  // Check if expense is older than 12 hours (real-time)
   const [canDelete, setCanDelete] = useState(true)
   
   useEffect(() => {
     const checkTime = () => {
-      const saleDate = new Date(viewTarget.date)
+      const expenseDate = new Date(viewTarget.date)
       const now = new Date()
-      const diffHours = (now - saleDate) / (1000 * 60 * 60)
+      const diffHours = (now - expenseDate) / (1000 * 60 * 60)
       setCanDelete(diffHours <= 12)
     }
     
@@ -133,12 +123,11 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
   
   const busy = saving || deleting
 
-  // Check if any items have changed from their original quantities
   const hasChanges = items.some(item => {
     const originalItem = viewTarget.items.find(orig => orig.productId === item.productId)
-    if (!originalItem) return true // New item added
+    if (!originalItem) return true
     return item.qty !== originalItem.qty || item.unitPrice !== originalItem.unitPrice
-  }) || items.length !== viewTarget.items.length // Check if items were removed
+  }) || items.length !== viewTarget.items.length
 
   async function handleSaveClick() {
     if (!hasChanges) {
@@ -147,11 +136,10 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
     }
 
     if (items.length === 0) {
-      setModalError('A sale needs at least one item. Use "Delete Sale" to remove it entirely instead.')
+      setModalError('An expense needs at least one item.')
       return
     }
 
-    // Validate stock availability before saving
     for (const it of items) {
       const productMeta = products.find(p => p.id === it.productId)
       if (!productMeta) {
@@ -180,144 +168,139 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
     if (!onDelete) return
     setShowDeleteConfirm(true)
   }
-
   return (
     <>
       <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-slate-600">
-        <Clock size={14} className="text-slate-400 shrink-0" />
-        <span>{formatDate(viewTarget.date)}</span>
-      </div>
-      <div className="text-sm text-slate-600">
-        <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
-        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
-          {items.map((item, idx) => {
-            const price = item.unitPrice || 0
-            const productMeta = products.find(p => p.id === item.productId)
-            const maxStock = productMeta ? (productMeta.current_stock + (typeof item.originalQty === 'number' ? item.originalQty : item.qty)) : undefined
-            return (
-              <div key={item.productId || idx} className="flex items:center justify-between gap-2 px-3 py-2">
-                <div className="flex-1 min-w-0 truncate">
-                  <span className="text-sm text-slate-800">{item.productName}</span>
-                  <span className="text-xs text-slate-400 ml-2">@ {formatCurrency(price)}</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {canEdit ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => updateQty(idx, item.qty - 1, maxStock)}
-                        disabled={busy}
-                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
-                      >-
-                      </button>
-                      <input
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) => updateQty(idx, e.target.value, maxStock)}
-                        min={1}
-                        max={maxStock}
-                        disabled={busy}
-                        className="w-16 text-center border border-slate-200 rounded px-2 py-1 text-sm disabled:opacity-50"
-                      />
-                      <button
-                        onClick={() => updateQty(idx, item.qty + 1, maxStock)}
-                        disabled={busy || (typeof maxStock === 'number' && item.qty >= maxStock)}
-                        className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
-                      >+
-                      </button>
-                      <button
-                        onClick={() => removeItem(idx)}
-                        disabled={busy}
-                        title="Remove item"
-                        className="ml-2 text-slate-400 hover:text-rose-500 disabled:opacity-50"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-400 ml-2">x{item.qty}</span>
-                  )}
-                </div>
-
-                <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
-              </div>
-            )
-          })}
-          {items.length === 0 && (
-            <div className="px-3 py-4 text-sm text-slate-400 text-center">No items in this sale.</div>
-          )}
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <Clock size={14} className="text-slate-400 shrink-0" />
+          <span>{formatDate(viewTarget.date)}</span>
         </div>
-      </div>
+        <div className="text-sm text-slate-600">
+          <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
+          <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+            {items.map((item, idx) => {
+              const price = item.unitPrice || 0
+              const productMeta = products.find(p => p.id === item.productId)
+              const maxStock = productMeta ? (productMeta.current_stock + (typeof item.originalQty === 'number' ? item.originalQty : item.qty)) : undefined
+              return (
+                <div key={item.productId || idx} className="flex items:center justify-between gap-2 px-3 py-2">
+                  <div className="flex-1 min-w-0 truncate">
+                    <span className="text-sm text-slate-800">{item.productName}</span>
+                    <span className="text-xs text-slate-400 ml-2">@ {formatCurrency(price)}</span>
+                  </div>
 
-      <div className="flex justify-between items-center pt-3 border-t border-slate-200">
-        <span className="text-sm font-medium text-slate-700">Total</span>
-        <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(total)}</span>
-      </div>
+                  <div className="flex items-center gap-2">
+                    {canEdit ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateQty(idx, item.qty - 1, maxStock)}
+                          disabled={busy}
+                          className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
+                        >-
+                        </button>
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => updateQty(idx, e.target.value, maxStock)}
+                          min={1}
+                          max={maxStock}
+                          disabled={busy}
+                          className="w-16 text-center border border-slate-200 rounded px-2 py-1 text-sm disabled:opacity-50"
+                        />
+                        <button
+                          onClick={() => updateQty(idx, item.qty + 1, maxStock)}
+                          disabled={busy || (typeof maxStock === 'number' && item.qty >= maxStock)}
+                          className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 text-sm font-medium transition-colors"
+                        >+
+                        </button>
+                        <button
+                          onClick={() => removeItem(idx)}
+                          disabled={busy}
+                          title="Remove item"
+                          className="ml-2 text-slate-400 hover:text-rose-500 disabled:opacity-50"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 ml-2">x{item.qty}</span>
+                    )}
+                  </div>
 
-      {modalError && (
-        <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{modalError}</p>
-      )}
+                  <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(price * item.qty)}</span>
+                </div>
+              )
+            })}
+            {items.length === 0 && (
+              <div className="px-3 py-4 text-sm text-slate-400 text-center">No items in this expense.</div>
+            )}
+          </div>
+        </div>
 
+        <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+          <span className="text-sm font-medium text-slate-700">Total</span>
+          <span className="text-lg font-bold text-slate-900 font-mono">{formatCurrency(total)}</span>
+        </div>
 
-      <div className="flex flex-col gap-2 pt-1">
-        <div className="flex gap-3">
-          <button onClick={onClose} disabled={busy} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all duration-200">Close</button>
-          {canEdit && (
+        {modalError && (
+          <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{modalError}</p>
+        )}
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={busy} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all duration-200">Close</button>
+            {canEdit && (
+              <button
+                onClick={handleSaveClick}
+                disabled={busy || !hasChanges}
+                className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-black font-medium flex items-center justify-center gap-2 transition-all duration-200"
+              >
+                <Check size={15} /> {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            )}
+          </div>
+          {canEdit && onDelete && canDelete && (
             <button
-              onClick={handleSaveClick}
-              disabled={busy || !hasChanges}
-              className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-black font-medium flex items-center justify-center gap-2 transition-all duration-200"
+              onClick={handleDeleteClick}
+              disabled={busy}
+              className="w-full py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
             >
-              <Check size={15} /> {saving ? 'Saving…' : 'Save Changes'}
+              <X size={15} /> {deleting ? 'Deleting…' : 'Delete Expense'}
             </button>
           )}
         </div>
-        {canEdit && onDelete && canDelete && (
-          <button
-            onClick={handleDeleteClick}
-            disabled={busy}
-            className="w-full py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
-          >
-            <X size={15} /> {deleting ? 'Deleting…' : 'Delete Sale'}
-          </button>
-        )}
       </div>
-    </div>
 
-    {/* Delete Confirmation Modal */}
-    {showDeleteConfirm && (
-      <ConfirmationModal
-        title="Confirm Delete"
-        message="This will permanently delete the sale and cannot be undone."
-        confirmText="Delete Sale"
-        cancelText="Cancel"
-        loading={deleting}
-        onConfirm={async () => {
-          setModalError('')
-          setDeleting(true)
-          try {
-            await onDelete(viewTarget.id)
-            setShowDeleteConfirm(false)
-            onClose()
-          } catch (err) {
-            setModalError(err instanceof Error ? err.message : 'Failed to delete sale')
-            setDeleting(false)
-            setShowDeleteConfirm(false)
-          }
-        }}
-        onCancel={() => setShowDeleteConfirm(false)}
-      />
-    )}
-
+      {showDeleteConfirm && (
+        <ConfirmationModal
+          title="Confirm Delete"
+          message="This will permanently delete the expense and cannot be undone."
+          confirmText="Delete Expense"
+          cancelText="Cancel"
+          loading={deleting}
+          onConfirm={async () => {
+            setModalError('')
+            setDeleting(true)
+            try {
+              await onDelete(viewTarget.id)
+              setShowDeleteConfirm(false)
+              onClose()
+            } catch (err) {
+              setModalError(err instanceof Error ? err.message : 'Failed to delete expense')
+              setDeleting(false)
+              setShowDeleteConfirm(false)
+            }
+          }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </>
   )
 }
 
-export default function Sales({ sales, products, categories, currentUser, onAdd, onEdit, onDelete, onForceEdit }) {
+export default function StaffExpensesPage({ expenses = [], products, categories, currentUser, onAdd, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
@@ -331,13 +314,13 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
 
-  const filtered = sales.filter(s => {
+  const filtered = expenses.filter(expense => {
     const matchesSearch =
-      s.user_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.items.some(i => i.productName.toLowerCase().includes(search.toLowerCase()))
-    const saleDate = new Date(s.date).setHours(0, 0, 0, 0)
-    const matchesStartDate = !startDate || saleDate >= new Date(startDate).setHours(0, 0, 0, 0)
-    const matchesEndDate = !endDate || saleDate <= new Date(endDate).setHours(23, 59, 59, 999)
+      expense.user_name?.toLowerCase().includes(search.toLowerCase()) ||
+      expense.items?.some(i => i.productName.toLowerCase().includes(search.toLowerCase()))
+    const expenseDate = new Date(expense.date).setHours(0, 0, 0, 0)
+    const matchesStartDate = !startDate || expenseDate >= new Date(startDate).setHours(0, 0, 0, 0)
+    const matchesEndDate = !endDate || expenseDate <= new Date(endDate).setHours(23, 59, 59, 999)
     return matchesSearch && matchesStartDate && matchesEndDate
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
@@ -351,7 +334,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   async function handleAdd() {
     if (loading) return
     if (cart.length === 0) {
-      setError('Please add at least one item to the sale.')
+      setError('Please add at least one item to the expense.')
       return
     }
 
@@ -393,12 +376,11 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       setError('')
       setAddOpen(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete sale')
+      setError(err instanceof Error ? err.message : 'Failed to complete expense')
     } finally {
       setLoading(false)
     }
   }
-
 
   function addToCart(productId) {
     const existing = cart.find(c => c.productId === productId)
@@ -436,11 +418,10 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
     const rowHeight = 7
     const headerHeight = 10
 
-    // Filter data by date range
-    const filteredData = sales.filter(s => {
-      const saleDate = new Date(s.date).setHours(0, 0, 0, 0)
-      const matchesStartDate = !startDate || saleDate >= new Date(startDate).setHours(0, 0, 0, 0)
-      const matchesEndDate = !endDate || saleDate <= new Date(endDate).setHours(23, 59, 59, 999)
+    const filteredData = expenses.filter(expense => {
+      const expenseDate = new Date(expense.date).setHours(0, 0, 0, 0)
+      const matchesStartDate = !startDate || expenseDate >= new Date(startDate).setHours(0, 0, 0, 0)
+      const matchesEndDate = !endDate || expenseDate <= new Date(endDate).setHours(23, 59, 59, 999)
       return matchesStartDate && matchesEndDate
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
@@ -453,12 +434,10 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length)
       const pageData = filteredData.slice(startIndex, endIndex)
 
-      // Title
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text('Sales Report', margin, 15)
+      doc.text('Staff Expenses Report', margin, 15)
 
-      // Date range info
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       const dateRangeText = startDate && endDate
@@ -471,8 +450,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       doc.text(dateRangeText, margin, 22)
       doc.text(`Page ${page + 1} of ${totalPages}`, pageWidth - margin, 22, { align: 'right' })
 
-      // Table header
-      const headers = ['#', 'Date', 'Cashier', 'Items', 'Total']
+      const headers = ['#', 'Date', 'Staff', 'Items', 'Total']
       const colWidths = [12, 45, 35, 150, 35]
       let xPos = margin
       const yPos = 30
@@ -489,63 +467,57 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
         xPos += colWidths[i]
       })
 
-      // Table rows
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
 
       let currentY = yPos + headerHeight
-      pageData.forEach((sale, i) => {
+      pageData.forEach((expense, i) => {
         xPos = margin
 
-        // Calculate row height based on wrapped items text
-        const itemsText = sale.items.map(item => `${item.productName} x${item.qty}`).join(', ')
+        const itemsText = expense.items.map(item => `${item.productName} x${item.qty}`).join(', ')
         const splitItems = doc.splitTextToSize(itemsText, colWidths[3])
         const lines = splitItems.length
         const dynamicRowHeight = Math.max(rowHeight, lines * 4)
 
-        // Row number
         doc.text(String(startIndex + i + 1), xPos, currentY)
         xPos += colWidths[0]
 
-        // Date
-        doc.text(formatDate(sale.date), xPos, currentY)
+        doc.text(formatDate(expense.date), xPos, currentY)
         xPos += colWidths[1]
 
-        // Cashier
-        doc.text(sale.user_name, xPos, currentY)
+        doc.text(expense.user_name, xPos, currentY)
         xPos += colWidths[2]
 
-        // Items (with wrapping)
         doc.text(itemsText, xPos, currentY, { maxWidth: colWidths[3] })
         xPos += colWidths[3]
 
-        // Total (aligned to top of row)
         doc.setFont('helvetica', 'bold')
-        doc.text('PHP ' + sale.total.toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
+        doc.text('PHP ' + expense.total.toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
         doc.setFont('helvetica', 'normal')
 
         currentY += dynamicRowHeight
       })
 
-      // Footer with total
-      const totalRevenue = filteredData.reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0)
+      const totalExpenses = filteredData.reduce((sum, exp) => sum + (parseFloat(exp.total) || 0), 0)
       const footerY = currentY + 5
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Total Revenue: PHP ${totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, margin, footerY)
+      doc.text(`Total Expenses: PHP ${totalExpenses.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, margin, footerY)
       doc.text(`Total Records: ${filteredData.length}`, pageWidth - margin, footerY, { align: 'right' })
     }
 
     const fileName = startDate && endDate
-      ? `sales_${startDate}_to_${endDate}.pdf`
+      ? `expenses_${startDate}_to_${endDate}.pdf`
       : startDate
-      ? `sales_from_${startDate}.pdf`
+      ? `expenses_from_${startDate}.pdf`
       : endDate
-      ? `sales_to_${endDate}.pdf`
-      : `sales_all_${new Date().toISOString().split('T')[0]}.pdf`
+      ? `expenses_to_${endDate}.pdf`
+      : `expenses_all_${new Date().toISOString().split('T')[0]}.pdf`
 
     doc.save(fileName)
   }
+
+  const totalAmount = filtered.reduce((sum, exp) => sum + (parseFloat(exp.total) || 0), 0)
 
   const cartTotal = cart.reduce((sum, item) => {
     const product = products.find(p => p.id === item.productId)
@@ -557,7 +529,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-sm text-slate-500 mt-0.5">{sales.length} transactions total</p>
+            <p className="text-sm text-slate-500 mt-0.5">{expenses.length} expenses total</p>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-row gap-3">
@@ -566,16 +538,18 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Search sales…"
+                  placeholder="Search expenses…"
                   className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
                 />
               </div>
-              <button
-                onClick={() => { setCart([]); setError(''); setAddOpen(true) }}
-                className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
-              >
-                <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> New Sale
-              </button>
+              {(currentUser.role === 'admin' || currentUser.role === 'staff') && (
+                <button
+                  onClick={() => { setCart([]); setProductSearch(''); setCategoryFilter(''); setError(''); setAddOpen(true) }}
+                  className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
+                >
+                  <Plus size={16} className="group-hover:rotate-90 transition-transform duration-200" /> New Expense
+                </button>
+              )}
             </div>
             <div className="flex flex-row gap-1">
               <input
@@ -607,27 +581,27 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       <div className="sm:hidden space-y-2.5">
         {filtered.length === 0 && (
           <div className="bg-white rounded-xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
-            {search ? 'No sales match your search.' : 'No sales yet.'}
+            {search ? 'No expenses match your search.' : 'No expenses yet.'}
           </div>
         )}
-        {paginated.map((sale, i) => (
-          <div key={sale.id} className="bg-white rounded-xl border border-slate-200 p-4">
+        {paginated.map((expense, i) => (
+          <div key={expense.id} className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800">{sale.user_name}</p>
+                <p className="text-sm font-medium text-slate-800">{expense.user_name}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <Clock size={11} className="text-slate-400 shrink-0" />
-                  <p className="text-xs text-slate-400">{formatDate(sale.date)}</p>
+                  <p className="text-xs text-slate-400">{formatDate(expense.date)}</p>
                 </div>
               </div>
-              <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(sale.total)}</span>
+              <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(expense.total)}</span>
             </div>
             <p className="text-xs text-slate-400 mt-2 truncate">
-              {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} — {sale.items.map(i => i.productName).join(', ')}
+              {expense.items.length} item{expense.items.length !== 1 ? 's' : ''} — {expense.items.map(i => i.productName).join(', ')}
             </p>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
               <button
-                onClick={() => setViewTarget(sale)}
+                onClick={() => setViewTarget(expense)}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
               >
                 <Eye size={13} /> View
@@ -644,7 +618,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Cashier</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Staff</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Items</th>
                 <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
                 <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
@@ -654,33 +628,33 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
-                    {search ? 'No sales match your search.' : 'No sales yet.'}
+                    {search ? 'No expenses match your search.' : 'No expenses yet.'}
                   </td>
                 </tr>
               )}
-              {paginated.map((sale) => (
-                <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+              {paginated.map((expense) => (
+                <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <Clock size={13} className="text-slate-400" />
-                      <span className="text-sm text-slate-600">{formatDate(sale.date)}</span>
+                      <span className="text-sm text-slate-600">{formatDate(expense.date)}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{sale.user_name}</td>
+                  <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{expense.user_name}</td>
                   <td className="px-5 py-3.5">
                     <div className="text-sm text-slate-600">
-                      {sale.items.length} item{sale.items.length !== 1 ? 's' : ''}
+                      {expense.items.length} item{expense.items.length !== 1 ? 's' : ''}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5 truncate max-w-32">
-                      {sale.items.map(i => i.productName).join(', ')}
+                      {expense.items.map(i => i.productName).join(', ')}
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total)}</span>
+                    <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(expense.total)}</span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <button
-                      onClick={() => setViewTarget(sale)}
+                      onClick={() => setViewTarget(expense)}
                       className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
                       title="View"
                     >
@@ -699,7 +673,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
           <p className="text-sm text-slate-500 text-center sm:text-left">
-            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} sales
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} expenses
           </p>
           <div className="flex items-center justify-center gap-2">
             <button
@@ -723,9 +697,9 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
         </div>
       )}
 
-      {/* New Sale Modal */}
+      {/* New Expense Modal */}
       {addOpen && (
-        <Modal title="New Sale" onClose={() => setAddOpen(false)}>
+        <Modal title="New Expense" onClose={() => setAddOpen(false)}>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Select Products</label>
@@ -838,38 +812,25 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
             <div className="flex gap-3 pt-1">
               <button onClick={() => setAddOpen(false)} className="flex-1 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Cancel</button>
               <button onClick={handleAdd} disabled={loading} className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-yellow-500/25 rounded-lg text-sm text-black font-medium flex items-center justify-center gap-2 transition-all duration-200">
-                <Check size={15} /> {loading ? 'Processing…' : 'Complete Sale'}
+                <Check size={15} /> {loading ? 'Processing…' : 'Complete Expense'}
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-
-      {/* View Sale */}
+      {/* View Expense */}
       {viewTarget && (
-        <Modal title="Sale Details" onClose={() => setViewTarget(null)}>
-          <SaleDetailsModal
+        <Modal title="Expense Details" onClose={() => setViewTarget(null)}>
+          <ExpenseDetailsModal
             viewTarget={viewTarget}
             products={products}
             currentUser={currentUser}
             onClose={() => setViewTarget(null)}
             onSave={async (updatedItems) => {
-              // Calculate new total
               const newTotal = updatedItems.reduce((sum, it) => sum + ((it.unitPrice || 0) * it.qty), 0)
-              // Call parent handler if provided
               if (onEdit) {
-                // Let errors propagate — the modal shows them inline and keeps
-                // the admin's edits on screen instead of silently discarding them.
                 await onEdit(viewTarget.id, { ...viewTarget, items: updatedItems, total: newTotal })
-                // Update local viewTarget for immediate feedback
-                setViewTarget(prev => ({ ...prev, items: updatedItems, total: newTotal }))
-                // On successful save, close the modal automatically
-                setViewTarget(null)
-              } else {
-                // No parent handler: optimistically update local viewTarget
-                setViewTarget(prev => ({ ...prev, items: updatedItems, total: newTotal }))
-                // Close modal since there is no parent to persist changes
                 setViewTarget(null)
               }
             }}

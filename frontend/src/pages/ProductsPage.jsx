@@ -290,7 +290,6 @@ export default function Products({ products, categories, currentUser, onAdd, onE
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Product</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Price</th>
@@ -303,17 +302,16 @@ export default function Products({ products, categories, currentUser, onAdd, onE
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
                     {search || categoryFilter !== 'all' ? 'No products match your filters.' : 'No products yet.'}
                   </td>
                 </tr>
               )}
-              {filtered.map((p, i) => {
+              {filtered.map((p) => {
                 const status = getProductStatus(p)
                 const category = categories.find(c => c.id === p.category_id)
                 return (
                   <tr key={String(p.id)} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">{i + 1}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">

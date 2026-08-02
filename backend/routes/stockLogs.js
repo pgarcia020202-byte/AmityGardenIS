@@ -28,8 +28,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Product ID is required' });
     }
 
-    if (!type || !['Stock In', 'Sale', 'Adjustment'].includes(type)) {
-      return res.status(400).json({ error: 'Valid type is required (Stock In, Sale, or Adjustment)' });
+    if (!type || !['Stock In', 'Sale', 'Adjustment', 'Expenses'].includes(type)) {
+      return res.status(400).json({ error: 'Valid type is required (Stock In, Sale, Adjustment, or Expenses)' });
     }
 
     // Get current product info

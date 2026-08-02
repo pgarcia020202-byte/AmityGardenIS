@@ -158,7 +158,6 @@ export default function Categories({ categories, products, currentUser, onAdd, o
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">#</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category Name</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Products</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Created</th>
@@ -168,14 +167,13 @@ export default function Categories({ categories, products, currentUser, onAdd, o
             <tbody className="divide-y divide-slate-50">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={4} className="px-5 py-12 text-center text-sm text-slate-400">
                     {search ? 'No categories match your search.' : 'No categories yet.'}
                   </td>
                 </tr>
               )}
-              {filtered.map((cat, i) => (
+              {filtered.map((cat) => (
                 <tr key={cat.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5 text-xs text-slate-400 font-mono">{i + 1}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center shrink-0">
