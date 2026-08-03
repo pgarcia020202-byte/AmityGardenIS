@@ -39,8 +39,8 @@ function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm,
 export default function StockLogs({ stockLogs, currentUser, onDelete }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -280,6 +280,7 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
                 <option value="Stock In">Stock In</option>
                 <option value="Sale">Sale</option>
                 <option value="Adjustment">Adjustment</option>
+                <option value="Expense">Expense</option>
               </select>
             </div>
             <div className="flex flex-row gap-1">
@@ -321,11 +322,15 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   log.type === 'Stock In' ? 'bg-green-50' :
-                  log.type === 'Sale' ? 'bg-rose-50' : 'bg-amber-50'
+                  log.type === 'Sale' ? 'bg-rose-50' :
+                  log.type === 'Expense' ? 'bg-purple-50' :
+                  'bg-amber-50'
                 }`}>
                   <Archive size={14} className={
                     log.type === 'Stock In' ? 'text-green-500' :
-                    log.type === 'Sale' ? 'text-rose-500' : 'text-amber-500'
+                    log.type === 'Sale' ? 'text-rose-500' :
+                    log.type === 'Expense' ? 'text-purple-500' :
+                    'text-amber-500'
                   } />
                 </div>
                 <div className="min-w-0">
@@ -343,6 +348,7 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
               <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                 log.type === 'Stock In' ? 'bg-green-100 text-green-700' :
                 log.type === 'Sale' ? 'bg-rose-100 text-rose-700' :
+                log.type === 'Expense' ? 'bg-purple-100 text-purple-700' :
                 'bg-amber-100 text-amber-700'
               }`}>
                 {log.type}
@@ -410,11 +416,15 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
                     <div className="flex items-center gap-2">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                         log.type === 'Stock In' ? 'bg-green-50' :
-                        log.type === 'Sale' ? 'bg-rose-50' : 'bg-amber-50'
+                        log.type === 'Sale' ? 'bg-rose-50' :
+                        log.type === 'Expense' ? 'bg-purple-50' :
+                        'bg-amber-50'
                       }`}>
                         <Archive size={13} className={
                           log.type === 'Stock In' ? 'text-green-500' :
-                          log.type === 'Sale' ? 'text-rose-500' : 'text-amber-500'
+                          log.type === 'Sale' ? 'text-rose-500' :
+                          log.type === 'Expense' ? 'text-purple-500' :
+                          'text-amber-500'
                         } />
                       </div>
                       <span className="text-sm font-medium text-slate-800">{log.product_name}</span>
@@ -424,6 +434,7 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                       log.type === 'Stock In' ? 'bg-green-100 text-green-700' :
                       log.type === 'Sale' ? 'bg-rose-100 text-rose-700' :
+                      log.type === 'Expense' ? 'bg-purple-100 text-purple-700' :
                       'bg-amber-100 text-amber-700'
                     }`}>
                       {log.type}

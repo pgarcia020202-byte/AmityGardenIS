@@ -325,8 +325,8 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   const [error, setError] = useState('')
   const [productSearch, setProductSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
