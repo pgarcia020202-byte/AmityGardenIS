@@ -10,13 +10,14 @@ router.get('/', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_addons, b.addons_items, b.created_at, b.updated_at
+              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_order, b.order_items, b.is_addons, b.addons_items, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        ORDER BY b.check_in_date DESC`
     ).catch(err => {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
         return pool.query(
           `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
                   b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
@@ -41,14 +42,15 @@ router.get('/active', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_addons, b.addons_items, b.created_at, b.updated_at
+              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_order, b.order_items, b.is_addons, b.addons_items, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        WHERE b.status = 'Checked In'
        ORDER BY b.check_in_date DESC`
     ).catch(err => {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
         return pool.query(
           `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
                   b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
@@ -75,14 +77,15 @@ router.get('/:id', authenticate, async (req, res) => {
     const result = await pool.query(
       `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
               b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
-              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_addons, b.addons_items, b.created_at, b.updated_at
+              b.timer_duration, b.is_complimentary, b.complimentary_item_1, b.complimentary_item_2, b.is_order, b.order_items, b.is_addons, b.addons_items, b.created_at, b.updated_at
        FROM bookings b
        JOIN rooms r ON b.room_id = r.id
        WHERE b.id = $1`,
       [id]
     ).catch(err => {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
         return pool.query(
           `SELECT b.id, b.room_id, r.room_number, r.room_type, b.guest_name, b.guest_contact,
                   b.number_of_guests, b.price, b.check_in_date, b.check_out_date, b.status, b.notes,
@@ -108,7 +111,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create booking (check-in) (admin or staff)
 router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
-    const { room_id, guest_name, guest_contact, number_of_guests, price, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items } = req.body;
+    const { room_id, guest_name, guest_contact, number_of_guests, price, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items } = req.body;
 
     if (!room_id) {
       return res.status(400).json({ error: 'Room is required' });
@@ -132,18 +135,19 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
     const trimmedGuestName = guest_name ? guest_name.trim() : null;
     const timerDurationValue = timer_duration || 30; // Default to 30 minutes if not provided
 
-    // Try with addons_items column first, fall back to without it
+    // Try with order_items and addons_items columns first, fall back to without them
     let result;
     try {
       result = await pool.query(
-        `INSERT INTO bookings (room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items)
-         VALUES ($1, $2, $3, $4, $5, NOW(), 'Checked In', $6, $7, $8, $9, $10, $11, $12)
-         RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items, created_at, updated_at`,
-        [room_id, trimmedGuestName, guest_contact, number_of_guests, price, notes, timerDurationValue, is_complimentary || false, complimentary_item_1 || null, complimentary_item_2 || null, is_addons || false, JSON.stringify(addons_items || [])]
+        `INSERT INTO bookings (room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items)
+         VALUES ($1, $2, $3, $4, $5, NOW(), 'Checked In', $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items, created_at, updated_at`,
+        [room_id, trimmedGuestName, guest_contact, number_of_guests, price, notes, timerDurationValue, is_complimentary || false, complimentary_item_1 || null, complimentary_item_2 || null, is_order || false, JSON.stringify(order_items || []), is_addons || false, JSON.stringify(addons_items || [])]
       );
     } catch (err) {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist') || 
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist') ||
           err.message.includes('INSERT has more expressions than target columns')) {
         result = await pool.query(
           `INSERT INTO bookings (room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons)
@@ -207,11 +211,12 @@ router.put('/:id/checkout', authenticate, requireAdminOrStaff, async (req, res) 
       `UPDATE bookings
        SET check_out_date = NOW(), status = 'Checked Out', updated_at = NOW()
        WHERE id = $1
-       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items, created_at, updated_at`,
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items, created_at, updated_at`,
       [id]
     ).catch(err => {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
         return pool.query(
           `UPDATE bookings
            SET check_out_date = NOW(), status = 'Checked Out', updated_at = NOW()
@@ -258,7 +263,7 @@ router.put('/:id/checkout', authenticate, requireAdminOrStaff, async (req, res) 
 router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
-    const { room_id, guest_name, guest_contact, number_of_guests, price, notes, status, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items } = req.body;
+    const { room_id, guest_name, guest_contact, number_of_guests, price, notes, status, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items } = req.body;
 
     // Check if booking exists
     const existing = await pool.query('SELECT id, room_id FROM bookings WHERE id = $1', [id]);
@@ -295,15 +300,18 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
            is_complimentary = COALESCE($8, is_complimentary),
            complimentary_item_1 = COALESCE($9, complimentary_item_1),
            complimentary_item_2 = COALESCE($10, complimentary_item_2),
-           is_addons = COALESCE($11, is_addons),
-           addons_items = COALESCE($12::jsonb, addons_items),
+           is_order = COALESCE($11, is_order),
+           order_items = COALESCE($12::jsonb, order_items),
+           is_addons = COALESCE($13, is_addons),
+           addons_items = COALESCE($14::jsonb, addons_items),
            updated_at = NOW()
-       WHERE id = $13
-       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_addons, addons_items, created_at, updated_at`,
-      [room_id, guest_name?.trim(), guest_contact, number_of_guests, notes, status, price, is_complimentary, compItem1, compItem2, is_addons, JSON.stringify(addons_items || []), id]
+       WHERE id = $15
+       RETURNING id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items, created_at, updated_at`,
+      [room_id, guest_name?.trim(), guest_contact, number_of_guests, notes, status, price, is_complimentary, compItem1, compItem2, is_order, JSON.stringify(order_items || []), is_addons, JSON.stringify(addons_items || []), id]
     ).catch(err => {
-      // Fallback if addons_items column doesn't exist yet
-      if (err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+      // Fallback if order_items or addons_items column doesn't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
         return pool.query(
           `UPDATE bookings
            SET room_id = COALESCE($1, room_id),

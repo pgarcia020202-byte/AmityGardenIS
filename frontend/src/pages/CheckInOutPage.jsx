@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Search, Plus, Pencil, Trash2, LogIn, LogOut, X, AlertCircle, Check, Bed, User, Phone, Mail, Users, Calendar, Eye, Clock, Timer, ClockPlus, Info, Package } from 'lucide-react'
 
 function Modal({ title, onClose, children }) {
@@ -247,298 +247,730 @@ function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
   )
 }
 
-function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpdate, onDelete, onClose, menuItems, menuCategories }) {
+function BookingDetailsModal({
+  viewTarget,
+  rooms,
+  currentUser,
+  onCheckOut,
+  onUpdate,
+  onDelete,
+  onClose,
+  menuItems = [],
+  menuCategories = []
+}) {
   const [isEditing, setIsEditing] = useState(false)
   const [roomSearch, setRoomSearch] = useState('')
   const [roomTypeFilter, setRoomTypeFilter] = useState('All')
+
   const [formData, setFormData] = useState({
-    room_id: viewTarget.room_id,
-    guest_name: viewTarget.guest_name || '',
-    guest_contact: viewTarget.guest_contact || '',
-    number_of_guests: viewTarget.number_of_guests,
-    price: viewTarget.price || 0,
-    notes: viewTarget.notes || '', // Notes field hidden for now but kept in state for compatibility
-    is_complimentary: viewTarget.is_complimentary || false,
-    complimentary_item_1: viewTarget.complimentary_item_1 || '',
-    complimentary_item_2: viewTarget.complimentary_item_2 || '',
-    is_addons: viewTarget.is_addons || false,
-    addons_items: viewTarget.addons_items || []
+    room_id: '',
+    guest_name: '',
+    guest_contact: '',
+    number_of_guests: '',
+    base_price: '',
+    price: '',
+    notes: '',
+    is_complimentary: false,
+    complimentary_item_1: '',
+    complimentary_item_2: '',
+    is_order: false,
+    order_items: [],
+    is_addons: false,
+    addons_items: []
   })
+  const prevBookingIdRef = useRef(null)
+
   const [saving, setSaving] = useState(false)
   const [checkingOut, setCheckingOut] = useState(false)
   const [modalError, setModalError] = useState('')
 
-  // Find the Add-ons category for add-ons items (move this before useEffect)
-  const addonsCategory = menuCategories ? menuCategories.find(c => c.name.toLowerCase() === 'add-ons') : null
-  const addonsItems = addonsCategory 
+  /*
+   * MENU CATEGORIES
+   */
+  const addonsCategory = menuCategories.find(
+    c => c.name?.toLowerCase() === 'add-ons'
+  )
+
+  const addonsItems = addonsCategory
     ? menuItems.filter(item => item.category_id === addonsCategory.id)
     : []
 
-  // Reset form data when viewTarget changes
-  useEffect(() => {
-    // Calculate base price by subtracting complimentary surcharge and addons from total price
-    const currentAddonsTotal = (viewTarget.addons_items || []).reduce((total, addon) => {
-      const item = addonsItems.find(i => i.id === addon.id)
-      return total + (item ? parseFloat(item.price) * addon.quantity : 0)
-    }, 0)
-    const complimentarySurcharge = viewTarget.is_complimentary ? 200 : 0
-    const calculatedBasePrice = (viewTarget.price || 0) - complimentarySurcharge - currentAddonsTotal
+  const orderItems = menuItems.filter(
+    item => item.category_id !== addonsCategory?.id
+  )
 
-    setFormData({
+  const complimentaryItems = menuItems.filter(
+    item => item.category_id !== addonsCategory?.id
+  )
+
+  /*
+   * RESET FORM WHEN BOOKING CHANGES
+   */
+  useEffect(() => {
+    // Only reset when booking ID changes, not when other properties change
+    if (prevBookingIdRef.current === viewTarget.id) {
+      return
+    }
+    prevBookingIdRef.current = viewTarget.id
+
+    const currentAddonsTotal = (viewTarget.addons_items || []).reduce(
+      (total, addon) => {
+        const item = addonsItems.find(i => i.id === addon.id)
+
+        return (
+          total +
+          (item ? parseFloat(item.price) * Number(addon.quantity || 0) : 0)
+        )
+      },
+      0
+    )
+
+    const currentOrderTotal = (viewTarget.order_items || []).reduce(
+      (total, order) => {
+        const item = orderItems.find(i => i.id === order.id)
+
+        return (
+          total +
+          (item ? parseFloat(item.price) * Number(order.quantity || 0) : 0)
+        )
+      },
+      0
+    )
+
+    const complimentarySurcharge = viewTarget.is_complimentary ? 200 : 0
+
+    const calculatedBasePrice =
+      Number(viewTarget.price || 0) -
+      complimentarySurcharge -
+      currentAddonsTotal -
+      currentOrderTotal
+
+    const newFormData = {
       room_id: viewTarget.room_id,
       guest_name: viewTarget.guest_name || '',
       guest_contact: viewTarget.guest_contact || '',
       number_of_guests: viewTarget.number_of_guests,
-      price: calculatedBasePrice > 0 ? calculatedBasePrice : viewTarget.price || 0,
+      base_price:
+        calculatedBasePrice >= 0
+          ? calculatedBasePrice
+          : Number(viewTarget.price || 0),
+      price: viewTarget.price || 0,
       notes: viewTarget.notes || '',
       is_complimentary: viewTarget.is_complimentary || false,
       complimentary_item_1: viewTarget.complimentary_item_1 || '',
       complimentary_item_2: viewTarget.complimentary_item_2 || '',
+      is_order: viewTarget.is_order || false,
+      order_items: viewTarget.order_items || [],
       is_addons: viewTarget.is_addons || false,
       addons_items: viewTarget.addons_items || []
-    })
+    }
+
+    setFormData(newFormData)
+    setIsEditing(false)
+    setModalError('')
   }, [viewTarget.id])
 
-  // Function to reset form data to original values
+  /*
+   * RESET FORM DATA
+   */
   const resetFormData = () => {
-    // Calculate base price by subtracting complimentary surcharge and addons from total price
-    const currentAddonsTotal = (viewTarget.addons_items || []).reduce((total, addon) => {
-      const item = addonsItems.find(i => i.id === addon.id)
-      return total + (item ? parseFloat(item.price) * addon.quantity : 0)
-    }, 0)
-    const complimentarySurcharge = viewTarget.is_complimentary ? 200 : 0
-    const calculatedBasePrice = (viewTarget.price || 0) - complimentarySurcharge - currentAddonsTotal
+    const currentAddonsTotal = (viewTarget.addons_items || []).reduce(
+      (total, addon) => {
+        const item = addonsItems.find(i => i.id === addon.id)
 
-    setFormData({
+        return (
+          total +
+          (item ? parseFloat(item.price) * Number(addon.quantity || 0) : 0)
+        )
+      },
+      0
+    )
+
+    const currentOrderTotal = (viewTarget.order_items || []).reduce(
+      (total, order) => {
+        const item = orderItems.find(i => i.id === order.id)
+
+        return (
+          total +
+          (item ? parseFloat(item.price) * Number(order.quantity || 0) : 0)
+        )
+      },
+      0
+    )
+
+    const complimentarySurcharge = viewTarget.is_complimentary ? 200 : 0
+
+    const calculatedBasePrice =
+      Number(viewTarget.price || 0) -
+      complimentarySurcharge -
+      currentAddonsTotal -
+      currentOrderTotal
+
+    const newFormData = {
       room_id: viewTarget.room_id,
       guest_name: viewTarget.guest_name || '',
       guest_contact: viewTarget.guest_contact || '',
       number_of_guests: viewTarget.number_of_guests,
-      price: calculatedBasePrice > 0 ? calculatedBasePrice : viewTarget.price || 0,
+      base_price:
+        calculatedBasePrice >= 0
+          ? calculatedBasePrice
+          : Number(viewTarget.price || 0),
+      price: viewTarget.price || 0,
       notes: viewTarget.notes || '',
       is_complimentary: viewTarget.is_complimentary || false,
       complimentary_item_1: viewTarget.complimentary_item_1 || '',
       complimentary_item_2: viewTarget.complimentary_item_2 || '',
+      is_order: viewTarget.is_order || false,
+      order_items: viewTarget.order_items || [],
       is_addons: viewTarget.is_addons || false,
       addons_items: viewTarget.addons_items || []
-    })
+    }
+
+    setFormData(newFormData)
+    setModalError('')
   }
 
-  const availableRooms = rooms.filter(r => r.status === 'Available')
+  /*
+   * AVAILABLE ROOMS
+   */
+  const availableRooms = rooms.filter(
+    r => r.status === 'Available' || r.id === viewTarget.room_id
+  )
 
-  const filteredAvailableRooms = availableRooms.filter(r => {
-    const matchesSearch = r.room_number.toLowerCase().includes(roomSearch.toLowerCase())
-    const matchesType = roomTypeFilter === 'All' || r.room_type === roomTypeFilter
+  const filteredAvailableRooms = availableRooms.filter(room => {
+    const matchesSearch = (room.room_number || '')
+      .toLowerCase()
+      .includes(roomSearch.toLowerCase())
+
+    const matchesType =
+      roomTypeFilter === 'All' || room.room_type === roomTypeFilter
+
     return matchesSearch && matchesType
   })
 
-  // Get complimentary item names if available
-  const getComplimentaryItemName = (itemId) => {
-    if (!itemId || !menuItems) return null
+  /*
+   * COMPLIMENTARY ITEM NAME
+   */
+  const getComplimentaryItemName = itemId => {
+    if (!itemId) return null
+
     const item = menuItems.find(m => m.id === itemId)
+
     return item ? item.name : null
   }
 
-  // Find the Silog category for complimentary items
-  const silogCategory = menuCategories ? menuCategories.find(c => c.name.toLowerCase() === 'silog') : null
-  const silogItems = silogCategory 
-    ? menuItems.filter(item => item.category_id === silogCategory.id)
-    : []
+  /*
+   * ORDER TOTAL
+   */
+  const orderTotal = useMemo(() => {
+    return formData.order_items.reduce((total, order) => {
+      const item = orderItems.find(i => i.id === order.id)
 
-  const canManage = currentUser?.role === 'admin' || currentUser?.role === 'staff'
-  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'staff'
-  const canDelete = currentUser?.role === 'admin'
+      return (
+        total +
+        (item
+          ? parseFloat(item.price) * Number(order.quantity || 0)
+          : 0)
+      )
+    }, 0)
+  }, [formData.order_items, orderItems])
 
-  // Calculate addons total price for edit modal
+  /*
+   * ADD-ONS TOTAL
+   */
   const addonsTotal = useMemo(() => {
     return formData.addons_items.reduce((total, addon) => {
       const item = addonsItems.find(i => i.id === addon.id)
-      return total + (item ? parseFloat(item.price) * addon.quantity : 0)
+
+      return (
+        total +
+        (item
+          ? parseFloat(item.price) * Number(addon.quantity || 0)
+          : 0)
+      )
     }, 0)
   }, [formData.addons_items, addonsItems])
 
-  const hasChanges = formData.room_id !== viewTarget.room_id ||
-                     formData.guest_name !== (viewTarget.guest_name || '') ||
-                     formData.guest_contact !== (viewTarget.guest_contact || '') ||
-                     formData.number_of_guests !== viewTarget.number_of_guests ||
-                     ((parseFloat(formData.price) || 0) + (formData.is_complimentary ? 200 : 0) + addonsTotal) !== (viewTarget.price || 0) ||
-                     formData.notes !== (viewTarget.notes || '') || // Notes field hidden but checked for changes
-                     formData.is_complimentary !== (viewTarget.is_complimentary || false) ||
-                     formData.complimentary_item_1 !== (viewTarget.complimentary_item_1 || '') ||
-                     formData.complimentary_item_2 !== (viewTarget.complimentary_item_2 || '') ||
-                     formData.is_addons !== (viewTarget.is_addons || false) ||
-                     JSON.stringify(formData.addons_items) !== JSON.stringify(viewTarget.addons_items || [])
+  /*
+   * TOTAL PRICE
+   *
+   * THIS WAS MISSING IN YOUR ORIGINAL CODE.
+   */
+  const totalPrice = useMemo(() => {
+    const basePrice = parseFloat(formData.base_price) || 0
 
-  function handleSaveClick() {
+    const complimentarySurcharge = formData.is_complimentary
+      ? 200
+      : 0
+
+    return (
+      basePrice +
+      complimentarySurcharge +
+      orderTotal +
+      addonsTotal
+    )
+  }, [
+    formData.base_price,
+    formData.is_complimentary,
+    orderTotal,
+    addonsTotal
+  ])
+
+  /*
+   * PERMISSIONS
+   */
+  const canManage =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'staff'
+
+  const canEdit =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'staff'
+
+  const canDelete =
+    currentUser?.role === 'admin'
+
+  /*
+   * CHECK WHETHER FORM HAS CHANGES
+   */
+  const hasChanges =
+    formData.room_id !== viewTarget.room_id ||
+    formData.guest_name !== (viewTarget.guest_name || '') ||
+    formData.guest_contact !== (viewTarget.guest_contact || '') ||
+    Number(formData.number_of_guests) !==
+      Number(viewTarget.number_of_guests) ||
+    Math.abs(totalPrice - Number(viewTarget.price || 0)) > 0.01 ||
+    formData.notes !== (viewTarget.notes || '') ||
+    formData.is_complimentary !==
+      (viewTarget.is_complimentary || false) ||
+    formData.complimentary_item_1 !==
+      (viewTarget.complimentary_item_1 || '') ||
+    formData.complimentary_item_2 !==
+      (viewTarget.complimentary_item_2 || '') ||
+    formData.is_order !==
+      (viewTarget.is_order || false) ||
+    JSON.stringify(formData.order_items) !==
+      JSON.stringify(viewTarget.order_items || []) ||
+    formData.is_addons !==
+      (viewTarget.is_addons || false) ||
+    JSON.stringify(formData.addons_items) !==
+      JSON.stringify(viewTarget.addons_items || [])
+
+  /*
+   * SAVE
+   */
+  async function handleSaveClick() {
     if (saving) return
-    if (!formData.number_of_guests || formData.number_of_guests <= 0) {
-      setModalError('Number of guests must be greater than 0.')
+
+    if (
+      !formData.number_of_guests ||
+      Number(formData.number_of_guests) <= 0
+    ) {
+      setModalError(
+        'Number of guests must be greater than 0.'
+      )
       return
     }
+
+    if (
+      formData.is_complimentary &&
+      !formData.complimentary_item_1 &&
+      !formData.complimentary_item_2
+    ) {
+      setModalError(
+        'Please select at least one complimentary item.'
+      )
+      return
+    }
+
+    if (
+      formData.is_order &&
+      formData.order_items.filter(
+        item => Number(item.quantity) > 0
+      ).length === 0
+    ) {
+      setModalError(
+        'Please select at least one ordered item with quantity.'
+      )
+      return
+    }
+
+    if (
+      formData.is_addons &&
+      formData.addons_items.filter(
+        item => Number(item.quantity) > 0
+      ).length === 0
+    ) {
+      setModalError(
+        'Please select at least one add-on item with quantity.'
+      )
+      return
+    }
+
     setModalError('')
     setSaving(true)
-    
-    // Calculate total price (base price + complimentary surcharge + addons)
-    const totalPrice = (parseFloat(formData.price) || 0) + (formData.is_complimentary ? 200 : 0) + addonsTotal
-    
-    onUpdate(viewTarget.id, { ...formData, price: totalPrice.toString() })
-      .then(() => {
-        setIsEditing(false)
-        setSaving(false)
-        onClose()
+
+    try {
+      const cleanOrderItems = formData.order_items.filter(
+        item => Number(item.quantity) > 0
+      )
+
+      const cleanAddonsItems = formData.addons_items.filter(
+        item => Number(item.quantity) > 0
+      )
+
+      const finalTotalPrice =
+        (parseFloat(formData.base_price) || 0) +
+        (formData.is_complimentary ? 200 : 0) +
+        orderTotal +
+        addonsTotal
+
+      await onUpdate(viewTarget.id, {
+        ...formData,
+
+        number_of_guests: Number(
+          formData.number_of_guests
+        ),
+
+        base_price: (
+          parseFloat(formData.base_price) || 0
+        ).toString(),
+
+        price: finalTotalPrice.toString(),
+
+        order_items: cleanOrderItems,
+
+        addons_items: cleanAddonsItems
       })
-      .catch(err => {
-        setModalError(err instanceof Error ? err.message : 'Failed to save changes')
-        setSaving(false)
-      })
+
+      setIsEditing(false)
+      setSaving(false)
+      onClose()
+    } catch (err) {
+      setModalError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save changes'
+      )
+
+      setSaving(false)
+    }
   }
 
-  function handleCheckOutClick() {
+  /*
+   * CHECK OUT
+   */
+  async function handleCheckOutClick() {
     if (checkingOut) return
+
     setModalError('')
     setCheckingOut(true)
-    onCheckOut(viewTarget.id)
-      .then(() => {
-        setCheckingOut(false)
-        onClose()
-      })
-      .catch(err => {
-        setModalError(err instanceof Error ? err.message : 'Failed to check out')
-        setCheckingOut(false)
-      })
+
+    try {
+      await onCheckOut(viewTarget.id)
+
+      setCheckingOut(false)
+      onClose()
+    } catch (err) {
+      setModalError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to check out'
+      )
+
+      setCheckingOut(false)
+    }
   }
 
-  const formatDate = (dateString) => {
+  /*
+   * FORMAT DATE
+   */
+  const formatDate = dateString => {
     if (!dateString) return '-'
+
     const date = new Date(dateString)
-    // Database already handles Asia/Manila timezone
-    
-    const options = {
+
+    return date.toLocaleString('en-PH', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
-    }
-    return date.toLocaleString('en-PH', options)
+    })
   }
 
   return (
     <>
       <div className="space-y-4">
+
+        {/* BOOKING INFORMATION */}
         <div className="grid grid-cols-2 gap-4">
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-900">Room:</span> {viewTarget.room_number} ({viewTarget.room_type})
+            <span className="font-medium text-slate-900">
+              Room:
+            </span>{' '}
+            {viewTarget.room_number} (
+            {viewTarget.room_type})
           </div>
+
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-900">Price:</span> ₱{Number(viewTarget.price).toFixed(2) || '0.00'}
+            <span className="font-medium text-slate-900">
+              Price:
+            </span>{' '}
+            ₱{Number(viewTarget.price || 0).toFixed(2)}
           </div>
         </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-900">Guest Name:</span> {viewTarget.guest_name || 'NA'}
+            <span className="font-medium text-slate-900">
+              Guest Name:
+            </span>{' '}
+            {viewTarget.guest_name || 'NA'}
           </div>
+
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-900">Contact Number:</span> {viewTarget.guest_contact || 'NA'}
+            <span className="font-medium text-slate-900">
+              Contact Number:
+            </span>{' '}
+            {viewTarget.guest_contact || 'NA'}
           </div>
         </div>
-        {/* Notes field hidden for now
-        <div className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">Notes:</span> {viewTarget.notes || 'NA'}
-        </div>
-        */}
+
+        {/* COMPLIMENTARY ITEMS */}
         {viewTarget.is_complimentary && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
               <Info size={14} />
               <span>Complimentary Items</span>
             </div>
+
             <div className="space-y-1">
-              {getComplimentaryItemName(viewTarget.complimentary_item_1) && (
-                <div className="text-sm text-slate-700">• {getComplimentaryItemName(viewTarget.complimentary_item_1)}</div>
+              {getComplimentaryItemName(
+                viewTarget.complimentary_item_1
+              ) && (
+                <div className="text-sm text-slate-700">
+                  •{' '}
+                  {getComplimentaryItemName(
+                    viewTarget.complimentary_item_1
+                  )}
+                </div>
               )}
-              {getComplimentaryItemName(viewTarget.complimentary_item_2) && (
-                <div className="text-sm text-slate-700">• {getComplimentaryItemName(viewTarget.complimentary_item_2)}</div>
+
+              {getComplimentaryItemName(
+                viewTarget.complimentary_item_2
+              ) && (
+                <div className="text-sm text-slate-700">
+                  •{' '}
+                  {getComplimentaryItemName(
+                    viewTarget.complimentary_item_2
+                  )}
+                </div>
               )}
-              {!getComplimentaryItemName(viewTarget.complimentary_item_1) && !getComplimentaryItemName(viewTarget.complimentary_item_2) && (
-                <div className="text-sm text-slate-500 italic">No items selected</div>
-              )}
+
+              {!getComplimentaryItemName(
+                viewTarget.complimentary_item_1
+              ) &&
+                !getComplimentaryItemName(
+                  viewTarget.complimentary_item_2
+                ) && (
+                  <div className="text-sm text-slate-500 italic">
+                    No items selected
+                  </div>
+                )}
             </div>
           </div>
         )}
-        {viewTarget.is_addons && viewTarget.addons_items && viewTarget.addons_items.length > 0 && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-800">
-              <Package size={14} />
-              <span>Add-ons Items</span>
+
+        {/* ORDER ITEMS */}
+        {viewTarget.is_order &&
+          viewTarget.order_items &&
+          viewTarget.order_items.length > 0 && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <Package size={14} />
+                <span>Order Items</span>
+              </div>
+
+              <div className="space-y-1">
+                {viewTarget.order_items.map(
+                  (orderItem, index) => {
+                    const itemName = menuItems.find(
+                      m => m.id === orderItem.id
+                    )?.name
+
+                    return itemName ? (
+                      <div
+                        key={index}
+                        className="text-sm text-slate-700"
+                      >
+                        • {itemName} (Qty:{' '}
+                        {orderItem.quantity})
+                      </div>
+                    ) : null
+                  }
+                )}
+              </div>
             </div>
-            <div className="space-y-1">
-              {viewTarget.addons_items.map((addonItem, index) => {
-                const itemName = menuItems?.find(m => m.id === addonItem.id)?.name
-                return itemName ? (
-                  <div key={index} className="text-sm text-slate-700">• {itemName} (Qty: {addonItem.quantity})</div>
-                ) : null
-              })}
+          )}
+
+        {viewTarget.is_order &&
+          (!viewTarget.order_items ||
+            viewTarget.order_items.length === 0) && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <Package size={14} />
+                <span>Order Items</span>
+              </div>
+
+              <div className="text-sm text-slate-500 italic mt-1">
+                No ordered items selected
+              </div>
             </div>
-          </div>
-        )}
-        {viewTarget.is_addons && (!viewTarget.addons_items || viewTarget.addons_items.length === 0) && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-800">
-              <Package size={14} />
-              <span>Add-ons Items</span>
+          )}
+
+        {/* ADD-ONS */}
+        {viewTarget.is_addons &&
+          viewTarget.addons_items &&
+          viewTarget.addons_items.length > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-purple-800">
+                <Package size={14} />
+                <span>Add-ons Items</span>
+              </div>
+
+              <div className="space-y-1">
+                {viewTarget.addons_items.map(
+                  (addonItem, index) => {
+                    const itemName = menuItems.find(
+                      m => m.id === addonItem.id
+                    )?.name
+
+                    return itemName ? (
+                      <div
+                        key={index}
+                        className="text-sm text-slate-700"
+                      >
+                        • {itemName} (Qty:{' '}
+                        {addonItem.quantity})
+                      </div>
+                    ) : null
+                  }
+                )}
+              </div>
             </div>
-            <div className="text-sm text-slate-500 italic mt-1">No add-ons selected</div>
-          </div>
-        )}
+          )}
+
+        {viewTarget.is_addons &&
+          (!viewTarget.addons_items ||
+            viewTarget.addons_items.length === 0) && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-purple-800">
+                <Package size={14} />
+                <span>Add-ons Items</span>
+              </div>
+
+              <div className="text-sm text-slate-500 italic mt-1">
+                No add-ons selected
+              </div>
+            </div>
+          )}
+
+        {/* DATES */}
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Clock size={14} className="text-slate-400 shrink-0" />
-            <span>Checked In: {formatDate(viewTarget.check_in_date)}</span>
+            <Clock
+              size={14}
+              className="text-slate-400 shrink-0"
+            />
+
+            <span>
+              Checked In:{' '}
+              {formatDate(viewTarget.check_in_date)}
+            </span>
           </div>
+
           {viewTarget.check_out_date && (
             <div className="flex items-center gap-2 text-sm text-slate-600">
-              <Clock size={14} className="text-slate-400 shrink-0" />
-              <span>Checked Out: {formatDate(viewTarget.check_out_date)}</span>
+              <Clock
+                size={14}
+                className="text-slate-400 shrink-0"
+              />
+
+              <span>
+                Checked Out:{' '}
+                {formatDate(viewTarget.check_out_date)}
+              </span>
             </div>
           )}
         </div>
 
-        {isEditing ? (
+        {/* EDIT FORM */}
+        {isEditing && (
           <div className="space-y-4">
+
+            {/* ROOM */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Select Room</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Select Room
+              </label>
+
               <div className="flex flex-row gap-2 mb-3">
                 <div className="relative flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+
                   <input
                     value={roomSearch}
-                    onChange={e => setRoomSearch(e.target.value)}
+                    onChange={e =>
+                      setRoomSearch(e.target.value)
+                    }
                     placeholder="Search rooms…"
-                    className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
+                    className="pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
                   />
                 </div>
+
                 <select
                   value={roomTypeFilter}
-                  onChange={e => setRoomTypeFilter(e.target.value)}
-                  className="px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 min-w-[120px]"
+                  onChange={e =>
+                    setRoomTypeFilter(e.target.value)
+                  }
+                  className="px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 min-w-[120px]"
                 >
-                  <option value="All">All Types</option>
-                  <option value="Standard">Standard</option>
-                  <option value="Family">Family</option>
-                  <option value="Barkada">Barkada</option>
+                  <option value="All">
+                    All Types
+                  </option>
+                  <option value="Standard">
+                    Standard
+                  </option>
+                  <option value="Family">
+                    Family
+                  </option>
+                  <option value="Barkada">
+                    Barkada
+                  </option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2">
+
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-2">
                 {filteredAvailableRooms.length === 0 ? (
-                  <p className="text-sm text-slate-400 col-span-2 text-center py-4">No available rooms match your search</p>
+                  <p className="text-sm text-slate-400 col-span-2 text-center py-4">
+                    No available rooms match your search
+                  </p>
                 ) : (
                   filteredAvailableRooms.map(room => (
                     <button
                       key={room.id}
                       type="button"
-                      onClick={() => setFormData({ ...formData, room_id: room.id })}
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          room_id: room.id
+                        })
+                      }
                       className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 ${
                         formData.room_id === room.id
                           ? 'border-yellow-300 bg-yellow-50'
@@ -546,251 +978,668 @@ function BookingDetailsModal({ viewTarget, rooms, currentUser, onCheckOut, onUpd
                       }`}
                     >
                       <div className="min-w-0">
-                        <span className="text-sm font-medium text-slate-800 truncate">{room.room_number}</span>
-                        <span className="text-xs text-slate-400 ml-2 whitespace-nowrap">{room.room_type}</span>
+                        <span className="text-sm font-medium text-slate-800 truncate">
+                          {room.room_number}
+                        </span>
+
+                        <span className="text-xs text-slate-400 ml-2 whitespace-nowrap">
+                          {room.room_type}
+                        </span>
                       </div>
-                      <span className="text-xs text-slate-400 shrink-0">Floor {room.floor_number}</span>
+
+                      <span className="text-xs text-slate-400 shrink-0">
+                        Floor {room.floor_number}
+                      </span>
                     </button>
                   ))
                 )}
               </div>
+
               {formData.room_id && (
                 <p className="text-xs text-slate-600 mt-2">
-                  Selected: {rooms.find(r => r.id === formData.room_id)?.room_number}
+                  Selected:{' '}
+                  {
+                    rooms.find(
+                      r => r.id === formData.room_id
+                    )?.room_number
+                  }
                 </p>
               )}
             </div>
+
+            {/* GUEST DETAILS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Guest Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Guest Name
+                </label>
+
                 <input
                   type="text"
-                  value={formData.guest_name}
-                  onChange={e => setFormData({ ...formData, guest_name: e.target.value })}
+                  value={formData.guest_name || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      guest_name: e.target.value
+                    })
+                  }
                   placeholder="Enter guest name"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Contact Number</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Contact Number
+                </label>
+
                 <input
                   type="text"
-                  value={formData.guest_contact}
-                  onChange={e => setFormData({ ...formData, guest_contact: e.target.value })}
+                  value={formData.guest_contact || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      guest_contact: e.target.value
+                    })
+                  }
                   placeholder="e.g. 09123456789"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
             </div>
+
+            {/* GUESTS + BASE PRICE */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Number of Guests</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Number of Guests
+                </label>
+
                 <input
                   type="number"
                   min="1"
-                  value={formData.number_of_guests}
-                  onChange={e => setFormData({ ...formData, number_of_guests: e.target.value })}
+                  value={formData.number_of_guests || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      number_of_guests: e.target.value
+                    })
+                  }
                   placeholder="1"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Base Price</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Base Price
+                </label>
+
+                {/* FIXED:
+                    This must use base_price, NOT price.
+                */}
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: e.target.value })}
+                  value={formData.base_price || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      base_price: e.target.value
+                    })
+                  }
                   placeholder="0.00"
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
             </div>
-            {!(viewTarget.status === 'Checked In' && !viewTarget.is_complimentary) && (
-              <div>
+
+            {/* COMPLIMENTARY AND ORDER */}
+            <div className="flex gap-4">
+              {!(
+                viewTarget.status === 'Checked In' &&
+                !viewTarget.is_complimentary
+              ) && (
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.is_complimentary}
-                    onChange={e => setFormData({ ...formData, is_complimentary: e.target.checked })}
-                    disabled={viewTarget.status === 'Checked In' && viewTarget.is_complimentary}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        is_complimentary:
+                          e.target.checked
+                      })
+                    }
+                    disabled={
+                      viewTarget.status === 'Checked In' &&
+                      viewTarget.is_complimentary
+                    }
                     className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span className="text-sm text-slate-700">Complimentary</span>
+
+                  <span className="text-sm text-slate-700">
+                    Complimentary
+                  </span>
                 </label>
-                
-                {viewTarget.status === 'Checked In' && viewTarget.is_complimentary && (
-                  <p className="text-xs text-slate-400 mt-1">Cannot change complimentary once checked in</p>
-                )}
-              </div>
-            )}
+              )}
+
+              {/* ORDER TOGGLE */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_order}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      is_order: e.target.checked,
+                      order_items: e.target.checked
+                        ? formData.order_items
+                        : []
+                    })
+                  }
+                  className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500"
+                />
+
+                <span className="text-sm text-slate-700">
+                  Order
+                </span>
+              </label>
+            </div>
+
+            {viewTarget.status === 'Checked In' &&
+              viewTarget.is_complimentary && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Cannot change complimentary once checked in
+                </p>
+              )}
+
+            {/* COMPLIMENTARY ITEMS */}
             {formData.is_complimentary && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Complimentary Item 1</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Complimentary Item 1
+                  </label>
+
                   <select
-                    value={formData.complimentary_item_1}
-                    onChange={e => setFormData({ ...formData, complimentary_item_1: e.target.value })}
+                    value={formData.complimentary_item_1 || ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        complimentary_item_1:
+                          e.target.value
+                      })
+                    }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   >
-                    {!formData.complimentary_item_1 && <option value="">Select item</option>}
-                    {silogItems.map(item => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                    {!formData.complimentary_item_1 && (
+                      <option value="">
+                        Select item
+                      </option>
+                    )}
+
+                    {complimentaryItems.map(item => (
+                      <option
+                        key={item.id}
+                        value={item.id}
+                      >
+                        {item.name}
+                      </option>
                     ))}
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Complimentary Item 2</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Complimentary Item 2
+                  </label>
+
                   <select
-                    value={formData.complimentary_item_2}
-                    onChange={e => setFormData({ ...formData, complimentary_item_2: e.target.value })}
+                    value={formData.complimentary_item_2 || ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        complimentary_item_2:
+                          e.target.value
+                      })
+                    }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   >
-                    {!formData.complimentary_item_2 && <option value="">Select item</option>}
-                    {silogItems.map(item => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                    {!formData.complimentary_item_2 && (
+                      <option value="">
+                        Select item
+                      </option>
+                    )}
+
+                    {complimentaryItems.map(item => (
+                      <option
+                        key={item.id}
+                        value={item.id}
+                      >
+                        {item.name}
+                      </option>
                     ))}
                   </select>
                 </div>
+
               </div>
             )}
-            {formData.is_complimentary && (
+
+            {/* ORDER ITEMS */}
+            {formData.is_order && (
               <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_addons}
-                    onChange={e => setFormData({ ...formData, is_addons: e.target.checked, addons_items: e.target.checked ? formData.addons_items : [] })}
-                    className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500"
-                  />
-                  <span className="text-sm text-slate-700">Add-ons</span>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Order Items
                 </label>
-              </div>
-            )}
-            {formData.is_addons && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Add-ons Items</label>
+
                 <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
-                  {addonsItems.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-2">No add-ons available</p>
+
+                  {orderItems.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-2">
+                      No menu items available for order
+                    </p>
                   ) : (
-                    addonsItems.map(item => (
-                      <div key={item.id} className="flex items-center justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-slate-700">{item.name}</span>
-                          <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
+                    orderItems.map(item => {
+                      const currentQty =
+                        formData.order_items.find(
+                          o => o.id === item.id
+                        )?.quantity || 0
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-700">
+                              {item.name}
+                            </span>
+
+                            <span className="text-xs text-slate-400 ml-2">
+                              ₱
+                              {parseFloat(
+                                item.price
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (currentQty <= 0) return
+
+                                const updatedOrder =
+                                  formData.order_items
+                                    .filter(
+                                      o =>
+                                        o.id !== item.id
+                                    )
+                                    .concat({
+                                      id: item.id,
+                                      quantity:
+                                        currentQty - 1
+                                    })
+                                    .filter(
+                                      o =>
+                                        o.quantity > 0
+                                    )
+
+                                setFormData({
+                                  ...formData,
+                                  order_items:
+                                    updatedOrder
+                                })
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              -
+                            </button>
+
+                            <span className="w-8 text-center text-sm text-slate-700">
+                              {currentQty}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedOrder =
+                                  formData.order_items
+                                    .filter(
+                                      o =>
+                                        o.id !== item.id
+                                    )
+                                    .concat({
+                                      id: item.id,
+                                      quantity:
+                                        currentQty + 1
+                                    })
+
+                                setFormData({
+                                  ...formData,
+                                  order_items:
+                                    updatedOrder
+                                })
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              +
+                            </button>
+
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
-                              if (currentQty > 0) {
-                                const updatedAddons = formData.addons_items
-                                  .filter(a => a.id !== item.id)
-                                  .concat({ id: item.id, quantity: currentQty - 1 })
-                                  .filter(a => a.quantity > 0)
-                                setFormData({ ...formData, addons_items: updatedAddons })
-                              }
-                            }}
-                            className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center text-sm text-slate-700">
-                            {formData.addons_items.find(a => a.id === item.id)?.quantity || 0}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
-                              const updatedAddons = formData.addons_items
-                                .filter(a => a.id !== item.id)
-                                .concat({ id: item.id, quantity: currentQty + 1 })
-                              setFormData({ ...formData, addons_items: updatedAddons })
-                            }}
-                            className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
+
                 </div>
-                {formData.addons_items.length > 0 && (
+
+                {formData.order_items.length > 0 && (
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Add-ons Total:</span>
+                    <span className="text-slate-600">
+                      Order Total:
+                    </span>
+
                     <span className="font-medium text-slate-900">
-                      ₱{formData.addons_items.reduce((total, addon) => {
-                        const item = addonsItems.find(i => i.id === addon.id)
-                        return total + (item ? parseFloat(item.price) * addon.quantity : 0)
-                      }, 0).toFixed(2)}
+                      ₱{orderTotal.toFixed(2)}
                     </span>
                   </div>
                 )}
               </div>
             )}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Base Price:</span>
-                <span className="text-slate-900">₱{(parseFloat(formData.price) || 0).toFixed(2)}</span>
+
+            {/* ADD-ONS TOGGLE */}
+            {(formData.is_complimentary || formData.is_order) && (
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_addons}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        is_addons: e.target.checked,
+                        addons_items: e.target.checked
+                          ? formData.addons_items
+                          : []
+                      })
+                    }
+                    className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500"
+                  />
+
+                  <span className="text-sm text-slate-700">
+                    Add-ons
+                  </span>
+                </label>
               </div>
+            )}
+
+            {/* ADD-ONS ITEMS */}
+            {formData.is_addons && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Add-ons Items
+                </label>
+
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+
+                  {addonsItems.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-2">
+                      No add-ons available
+                    </p>
+                  ) : (
+                    addonsItems.map(item => {
+                      const currentQty =
+                        formData.addons_items.find(
+                          a => a.id === item.id
+                        )?.quantity || 0
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-700">
+                              {item.name}
+                            </span>
+
+                            <span className="text-xs text-slate-400 ml-2">
+                              ₱
+                              {parseFloat(
+                                item.price
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (currentQty <= 0) return
+
+                                const updatedAddons =
+                                  formData.addons_items
+                                    .filter(
+                                      a =>
+                                        a.id !== item.id
+                                    )
+                                    .concat({
+                                      id: item.id,
+                                      quantity:
+                                        currentQty - 1
+                                    })
+                                    .filter(
+                                      a =>
+                                        a.quantity > 0
+                                    )
+
+                                setFormData({
+                                  ...formData,
+                                  addons_items:
+                                    updatedAddons
+                                })
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              -
+                            </button>
+
+                            <span className="w-8 text-center text-sm text-slate-700">
+                              {currentQty}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedAddons =
+                                  formData.addons_items
+                                    .filter(
+                                      a =>
+                                        a.id !== item.id
+                                    )
+                                    .concat({
+                                      id: item.id,
+                                      quantity:
+                                        currentQty + 1
+                                    })
+
+                                setFormData({
+                                  ...formData,
+                                  addons_items:
+                                    updatedAddons
+                                })
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              +
+                            </button>
+
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+
+                </div>
+
+                {formData.addons_items.length > 0 && (
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-slate-600">
+                      Add-ons Total:
+                    </span>
+
+                    <span className="font-medium text-slate-900">
+                      ₱{addonsTotal.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PRICE SUMMARY */}
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">
+                  Base Price:
+                </span>
+
+                <span className="text-slate-900">
+                  ₱
+                  {(
+                    parseFloat(
+                      formData.base_price
+                    ) || 0
+                  ).toFixed(2)}
+                </span>
+              </div>
+
               {formData.is_complimentary && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Complimentary Surcharge:</span>
-                  <span className="text-slate-900">₱200.00</span>
+                  <span className="text-slate-600">
+                    Complimentary Surcharge:
+                  </span>
+
+                  <span className="text-slate-900">
+                    ₱200.00
+                  </span>
                 </div>
               )}
-              {formData.is_addons && addonsTotal > 0 && (
+
+              {orderTotal > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Add-ons Total:</span>
-                  <span className="text-slate-900">₱{addonsTotal.toFixed(2)}</span>
+                  <span className="text-slate-600">
+                    Order Total:
+                  </span>
+
+                  <span className="text-slate-900">
+                    ₱{orderTotal.toFixed(2)}
+                  </span>
                 </div>
               )}
+
+              {formData.is_addons &&
+                addonsTotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">
+                      Add-ons Total:
+                    </span>
+
+                    <span className="text-slate-900">
+                      ₱{addonsTotal.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
               <div className="flex justify-between text-sm font-medium border-t border-slate-200 pt-2">
-                <span className="text-slate-900">Total Price:</span>
-                <span className="text-yellow-600">₱{((parseFloat(formData.price) || 0) + (formData.is_complimentary ? 200 : 0) + addonsTotal).toFixed(2)}</span>
+                <span className="text-slate-900">
+                  Total Price:
+                </span>
+
+                <span className="text-yellow-600">
+                  ₱{totalPrice.toFixed(2)}
+                </span>
               </div>
+
             </div>
           </div>
-        ) : null}
-
-        {modalError && (
-          <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{modalError}</p>
         )}
 
+        {/* ERROR */}
+        {modalError && (
+          <p className="text-xs text-rose-600 flex items-center gap-1">
+            <AlertCircle size={12} />
+            {modalError}
+          </p>
+        )}
+
+        {/* BUTTONS */}
         <div className="grid grid-cols-2 gap-2 pt-1">
+
           {isEditing ? (
-            <button onClick={handleSaveClick} disabled={!hasChanges || saving} className="py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-black font-medium transition-all duration-200">
+            <button
+              onClick={handleSaveClick}
+              disabled={!hasChanges || saving}
+              className="py-2.5 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm text-black font-medium transition-all duration-200"
+            >
               {saving ? 'Saving…' : 'Save'}
             </button>
           ) : (
-            canEdit && viewTarget.status !== 'Checked Out' && (
-              <button onClick={() => setIsEditing(true)} className="py-2.5 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg text-sm font-medium transition-all duration-200">
+            canEdit &&
+            viewTarget.status !== 'Checked Out' && (
+              <button
+                onClick={() => {
+                  setModalError('')
+                  setRoomSearch('')
+                  setRoomTypeFilter('All')
+                  setIsEditing(true)
+                }}
+                className="py-2.5 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg text-sm font-medium transition-all duration-200"
+              >
                 Edit
               </button>
             )
           )}
-          {isEditing ? (
-            <button onClick={() => { resetFormData(); setIsEditing(false) }} disabled={saving} className="py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200">Cancel</button>
-          ) : null}
-          {!isEditing && viewTarget.status === 'Checked In' && canManage && (
+
+          {isEditing && (
             <button
-              onClick={handleCheckOutClick}
-              disabled={checkingOut}
-              className="py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all duration-200"
+              onClick={() => {
+                resetFormData()
+                setIsEditing(false)
+              }}
+              disabled={saving}
+              className="py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200"
             >
-              {checkingOut ? 'Checking out…' : 'Check Out'}
+              Cancel
             </button>
           )}
+
+          {!isEditing &&
+            viewTarget.status === 'Checked In' &&
+            canManage && (
+              <button
+                onClick={handleCheckOutClick}
+                disabled={checkingOut}
+                className="py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all duration-200"
+              >
+                {checkingOut
+                  ? 'Checking out…'
+                  : 'Check Out'}
+              </button>
+            )}
+
         </div>
       </div>
-
     </>
   )
 }
+
 
 export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn, onCheckOut, onUpdate, onDelete, onExtend, highlightedBookingId, onTimerEnd, menuItems, menuCategories }) {
   const [search, setSearch] = useState('')
@@ -812,7 +1661,9 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     is_complimentary: false,
     complimentary_item_1: '',
     complimentary_item_2: '',
+    is_order: false,
     is_addons: false,
+    order_items: [],
     addons_items: []
   })
   const [extendFormData, setExtendFormData] = useState({
@@ -865,16 +1716,20 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     return matchesSearch && matchesType
   })
 
-  // Find the Silog category for complimentary items
-  const silogCategory = menuCategories.find(c => c.name.toLowerCase() === 'silog')
-  const silogItems = silogCategory 
-    ? menuItems.filter(item => item.category_id === silogCategory.id)
-    : []
-
   const addonsCategory = menuCategories.find(c => c.name.toLowerCase() === 'add-ons')
   const addonsItems = addonsCategory 
     ? menuItems.filter(item => item.category_id === addonsCategory.id)
     : []
+  const orderItems = menuItems.filter(item => item.category_id !== addonsCategory?.id)
+  const complimentaryItems = menuItems.filter(item => item.category_id !== addonsCategory?.id)
+
+  // Calculate order total price
+  const orderTotal = useMemo(() => {
+    return formData.order_items.reduce((total, order) => {
+      const item = orderItems.find(i => i.id === order.id)
+      return total + (item ? parseFloat(item.price) * order.quantity : 0)
+    }, 0)
+  }, [formData.order_items, orderItems])
 
   // Calculate addons total price
   const addonsTotal = useMemo(() => {
@@ -884,12 +1739,12 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     }, 0)
   }, [formData.addons_items, addonsItems])
 
-  // Calculate total price from base price + addons + complimentary surcharge
+  // Calculate total price from base price + addons + complimentary surcharge + orders
   const totalPrice = useMemo(() => {
     const basePrice = parseFloat(formData.base_price) || 0
     const complimentarySurcharge = formData.is_complimentary ? 200 : 0
-    return basePrice + addonsTotal + complimentarySurcharge
-  }, [formData.base_price, formData.is_complimentary, addonsTotal])
+    return basePrice + addonsTotal + orderTotal + complimentarySurcharge
+  }, [formData.base_price, formData.is_complimentary, addonsTotal, orderTotal])
 
   // Update price when calculation changes
   useEffect(() => {
@@ -904,6 +1759,23 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       return matchesSearch && matchesStatus
     })
     .sort((a, b) => new Date(b.check_in_date) - new Date(a.check_in_date))
+
+  function updateAddOnVisibility(updates) {
+    setFormData(prev => {
+      const next = { ...prev, ...updates }
+      const hasParentSelection = Boolean(next.is_complimentary || next.is_order)
+
+      if (!hasParentSelection) {
+        return {
+          ...next,
+          is_addons: false,
+          addons_items: []
+        }
+      }
+
+      return next
+    })
+  }
 
   function getStatusColor(status) {
     switch (status) {
@@ -926,7 +1798,9 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       is_complimentary: false,
       complimentary_item_1: '',
       complimentary_item_2: '',
+      is_order: false,
       is_addons: false,
+      order_items: [],
       addons_items: []
     })
     setError('')
@@ -946,6 +1820,9 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     if (formData.is_addons && formData.addons_items.filter(item => item.quantity > 0).length === 0) {
       setError('Please select at least one add-on item with quantity.'); return
     }
+    if (formData.is_order && formData.order_items.filter(item => item.quantity > 0).length === 0) {
+      setError('Please select at least one ordered item with quantity.'); return
+    }
     setLoading(true)
     try {
       // Convert hours to minutes for the backend
@@ -960,6 +1837,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
         is_complimentary: Boolean(formData.is_complimentary),
         complimentary_item_1: formData.complimentary_item_1 ? parseInt(formData.complimentary_item_1) : null,
         complimentary_item_2: formData.complimentary_item_2 ? parseInt(formData.complimentary_item_2) : null,
+        is_order: Boolean(formData.is_order),
+        order_items: formData.order_items.filter(item => item.quantity > 0),
         is_addons: Boolean(formData.is_addons),
         addons_items: formData.addons_items.filter(item => item.quantity > 0)
       }
@@ -975,7 +1854,9 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
         is_complimentary: false,
         complimentary_item_1: '',
         complimentary_item_2: '',
+        is_order: false,
         is_addons: false,
+        order_items: [],
         addons_items: []
       })
       setError('')
@@ -1355,23 +2236,32 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                 />
               </div>
               */}
-              <div>
+              <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.is_complimentary}
-                    onChange={e => setFormData({ ...formData, is_complimentary: e.target.checked })}
+                    onChange={e => updateAddOnVisibility({ is_complimentary: e.target.checked })}
                     className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <span className="text-sm text-slate-700">Complimentary</span>
                 </label>
-                {formData.is_complimentary && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    <Info size={12} />
-                    <span>Additional ₱200 charge added</span>
-                  </div>
-                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_order}
+                    onChange={e => updateAddOnVisibility({ is_order: e.target.checked, order_items: e.target.checked ? formData.order_items : [] })}
+                    className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500"
+                  />
+                  <span className="text-sm text-slate-700">Order</span>
+                </label>
               </div>
+              {formData.is_complimentary && (
+                <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  <Info size={12} />
+                  <span>Additional ₱200 charge added</span>
+                </div>
+              )}
               {formData.is_complimentary && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1382,7 +2272,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     >
                       {!formData.complimentary_item_1 && <option value="">Select item</option>}
-                      {silogItems.map(item => (
+                      {complimentaryItems.map(item => (
                         <option key={item.id} value={item.id}>{item.name}</option>
                       ))}
                     </select>
@@ -1395,27 +2285,86 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                       className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     >
                       {!formData.complimentary_item_2 && <option value="">Select item</option>}
-                      {silogItems.map(item => (
+                      {complimentaryItems.map(item => (
                         <option key={item.id} value={item.id}>{item.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
               )}
-              {formData.is_complimentary && (
+              {formData.is_order && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Order Items</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                    {orderItems.length === 0 ? (
+                      <p className="text-sm text-slate-400 text-center py-2">No menu items available for order</p>
+                    ) : (
+                      orderItems.map(item => (
+                        <div key={item.id} className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-700">{item.name}</span>
+                            <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = formData.order_items.find(a => a.id === item.id)?.quantity || 0
+                                if (currentQty > 0) {
+                                  const updatedOrder = formData.order_items
+                                    .filter(a => a.id !== item.id)
+                                    .concat({ id: item.id, quantity: currentQty - 1 })
+                                    .filter(a => a.quantity > 0)
+                                  setFormData({ ...formData, order_items: updatedOrder })
+                                }
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center text-sm text-slate-700">
+                              {formData.order_items.find(a => a.id === item.id)?.quantity || 0}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = formData.order_items.find(a => a.id === item.id)?.quantity || 0
+                                const updatedOrder = formData.order_items
+                                  .filter(a => a.id !== item.id)
+                                  .concat({ id: item.id, quantity: currentQty + 1 })
+                                setFormData({ ...formData, order_items: updatedOrder })
+                              }}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {formData.order_items.length > 0 && (
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Order Total:</span>
+                      <span className="font-medium text-slate-900">₱{orderTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(formData.is_complimentary || formData.is_order) && (
                 <div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.is_addons}
-                      onChange={e => setFormData({ ...formData, is_addons: e.target.checked, addons_items: e.target.checked ? formData.addons_items : [] })}
+                      onChange={e => setFormData(prev => ({ ...prev, is_addons: e.target.checked, addons_items: e.target.checked ? prev.addons_items : [] }))}
                       className="w-4 h-4 text-yellow-500 border-slate-300 rounded focus:ring-yellow-500"
                     />
                     <span className="text-sm text-slate-700">Add-ons</span>
                   </label>
                 </div>
               )}
-              {formData.is_addons && (
+              {formData.is_addons && (formData.is_complimentary || formData.is_order) && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Add-ons Items</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
@@ -1485,6 +2434,12 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Complimentary Surcharge:</span>
                     <span className="text-slate-900">₱200.00</span>
+                  </div>
+                )}
+                {formData.is_order && orderTotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Order Total:</span>
+                    <span className="text-slate-900">₱{orderTotal.toFixed(2)}</span>
                   </div>
                 )}
                 {formData.is_addons && addonsTotal > 0 && (

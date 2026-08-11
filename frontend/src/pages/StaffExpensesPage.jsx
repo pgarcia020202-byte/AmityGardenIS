@@ -308,8 +308,14 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
   const [error, setError] = useState('')
   const [productSearch, setProductSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+  })
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+  })
   const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
@@ -512,7 +518,10 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
       ? `expenses_from_${startDate}.pdf`
       : endDate
       ? `expenses_to_${endDate}.pdf`
-      : `expenses_all_${new Date().toISOString().split('T')[0]}.pdf`
+      : `expenses_all_${(() => {
+          const now = new Date()
+          return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+        })()}.pdf`
 
     doc.save(fileName)
   }
@@ -556,14 +565,20 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={(() => {
+                  const now = new Date()
+                  return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+                })()}
                 className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               />
               <input
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={(() => {
+                  const now = new Date()
+                  return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+                })()}
                 className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               />
               <button

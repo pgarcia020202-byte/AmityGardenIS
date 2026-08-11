@@ -39,8 +39,14 @@ function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm,
 export default function StockLogs({ stockLogs, currentUser, onDelete }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+  })
+  const [endDate, setEndDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+  })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -288,14 +294,20 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={(() => {
+                  const now = new Date()
+                  return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+                })()}
                 className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               />
               <input
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={(() => {
+                  const now = new Date()
+                  return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+                })()}
                 className="flex-1 px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               />
               <button

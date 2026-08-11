@@ -75,6 +75,11 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
       return
     }
 
+    if (name.toLowerCase() === 'add-ons' || name.toLowerCase() === 'complimentary') {
+      setCategoryError('Cannot add "Add-ons" or "Complimentary" categories.')
+      return
+    }
+
     setCategoryLoading(true)
     try {
       await onAddCategory({
@@ -96,6 +101,11 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
 
     if (!name) { setCategoryError('Category name is required.'); return }
 
+    if (name.toLowerCase() === 'add-ons' || name.toLowerCase() === 'complimentary') {
+      setCategoryError('Cannot rename to "Add-ons" or "Complimentary".')
+      return
+    }
+
     setCategoryLoading(true)
     try {
       await onEditCategory(editCategoryTarget.id, {
@@ -112,6 +122,10 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
 
   async function handleDeleteCategory() {
     if (categoryLoading) return
+    if (deleteCategoryTarget.name.toLowerCase() === 'add-ons' || deleteCategoryTarget.name.toLowerCase() === 'complimentary') {
+      setCategoryError('Cannot delete "Add-ons" or "Complimentary" categories.')
+      return
+    }
     setCategoryLoading(true)
     try {
       await onDeleteCategory(deleteCategoryTarget.id)
@@ -465,7 +479,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     </div>
                   </div>
                 </div>
-                {canEdit && (
+                {canEdit && cat.name.toLowerCase() !== 'add-ons' && cat.name.toLowerCase() !== 'complimentary' && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => openEditCategory(cat)}
@@ -519,7 +533,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                           {menuItems.filter(item => item.category_id === cat.id).length} item{menuItems.filter(item => item.category_id === cat.id).length !== 1 ? 's' : ''}
                         </span>
                       </td>
-                      {canEdit && (
+                      {canEdit && cat.name.toLowerCase() !== 'add-ons' && cat.name.toLowerCase() !== 'complimentary' && (
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
