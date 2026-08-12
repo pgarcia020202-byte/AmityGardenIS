@@ -16,6 +16,9 @@ function Modal({ title, onClose, children }) {
 }
 
 export default function HotelMenus({ menuCategories, menuItems, currentUser, onAddCategory, onEditCategory, onDeleteCategory, onAddItem, onEditItem, onDeleteItem }) {
+  const safeMenuCategories = Array.isArray(menuCategories) ? menuCategories : []
+  const safeMenuItems = Array.isArray(menuItems) ? menuItems : []
+
   const [activeTab, setActiveTab] = useState('items')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -39,25 +42,25 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
   const [itemError, setItemError] = useState('')
   const [itemLoading, setItemLoading] = useState(false)
 
-  const filteredCategories = menuCategories.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase())
+  const filteredCategories = safeMenuCategories.filter(c => {
+    const matchesSearch = String(c?.name ?? '').toLowerCase().includes(search.toLowerCase())
     return matchesSearch
-  }).sort((a, b) => a.name.localeCompare(b.name))
+  }).sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')))
 
-  const filteredItems = menuItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase())
+  const filteredItems = safeMenuItems.filter(item => {
+    const matchesSearch = String(item?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter === 'all' || String(item.category_id) === String(categoryFilter)
     return matchesSearch && matchesCategory
   }).sort((a, b) => {
     switch(sortBy) {
       case 'name':
-        return a.name.localeCompare(b.name)
+        return String(a?.name ?? '').localeCompare(String(b?.name ?? ''))
       case 'price-low':
-        return parseFloat(a.price) - parseFloat(b.price)
+        return parseFloat(a.price || 0) - parseFloat(b.price || 0)
       case 'price-high':
-        return parseFloat(b.price) - parseFloat(a.price)
+        return parseFloat(b.price || 0) - parseFloat(a.price || 0)
       default:
-        return a.name.localeCompare(b.name)
+        return String(a?.name ?? '').localeCompare(String(b?.name ?? ''))
     }
   })
 
@@ -69,7 +72,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
 
     if (!name) { setCategoryError('Category name is required.'); return }
 
-    const existingCategory = menuCategories.find(c => c.name.toLowerCase() === name.toLowerCase())
+    const existingCategory = safeMenuCategories.find(c => String(c?.name ?? '').toLowerCase() === name.toLowerCase())
     if (existingCategory) {
       setCategoryError('A category with this name already exists.')
       return
@@ -122,7 +125,8 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
 
   async function handleDeleteCategory() {
     if (categoryLoading) return
-    if (deleteCategoryTarget.name.toLowerCase() === 'add-ons' || deleteCategoryTarget.name.toLowerCase() === 'complimentary') {
+    const deleteCategoryName = String(deleteCategoryTarget?.name ?? '').toLowerCase()
+    if (deleteCategoryName === 'add-ons' || deleteCategoryName === 'complimentary') {
       setCategoryError('Cannot delete "Add-ons" or "Complimentary" categories.')
       return
     }
@@ -230,7 +234,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
     setItemError('')
   }
 
-  const canEdit = currentUser.role === 'admin' || currentUser.role === 'staff'
+  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">
@@ -264,7 +268,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
           <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div>
-                <p className="text-sm text-slate-500 mt-0.5">{menuItems.length} items total</p>
+                <p className="text-sm text-slate-500 mt-0.5">{safeMenuItems.length} items total</p>
               </div>
               <div className="flex flex-col gap-3">
                 <div className="flex flex-row gap-3">
@@ -293,7 +297,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     className="px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   >
                     <option value="all">All Categories</option>
-                    {menuCategories.map(cat => (
+                    {safeMenuCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
@@ -319,7 +323,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
               </div>
             )}
             {filteredItems.map(item => {
-              const category = menuCategories.find(c => c.id === item.category_id)
+              const category = safeMenuCategories.find(c => c.id === item.category_id)
               return (
                 <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -380,7 +384,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     </tr>
                   )}
                   {filteredItems.map((item) => {
-                    const category = menuCategories.find(c => c.id === item.category_id)
+                    const category = safeMenuCategories.find(c => c.id === item.category_id)
                     return (
                       <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-3.5">
@@ -433,7 +437,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
           <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div>
-                <p className="text-sm text-slate-500 mt-0.5">{menuCategories.length} categories total</p>
+                <p className="text-sm text-slate-500 mt-0.5">{safeMenuCategories.length} categories total</p>
               </div>
               <div className="flex flex-row gap-3">
                 <div className="relative">
@@ -474,12 +478,12 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{cat.name}</p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {menuItems.filter(item => item.category_id === cat.id).length} item{menuItems.filter(item => item.category_id === cat.id).length !== 1 ? 's' : ''}
+                        {safeMenuItems.filter(item => item.category_id === cat.id).length} item{safeMenuItems.filter(item => item.category_id === cat.id).length !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                 </div>
-                {canEdit && cat.name.toLowerCase() !== 'add-ons' && cat.name.toLowerCase() !== 'complimentary' && (
+                {canEdit && String(cat?.name ?? '').toLowerCase() !== 'add-ons' && String(cat?.name ?? '').toLowerCase() !== 'complimentary' && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                     <button
                       onClick={() => openEditCategory(cat)}
@@ -530,10 +534,10 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-sm text-slate-600">
-                          {menuItems.filter(item => item.category_id === cat.id).length} item{menuItems.filter(item => item.category_id === cat.id).length !== 1 ? 's' : ''}
+                          {safeMenuItems.filter(item => item.category_id === cat.id).length} item{safeMenuItems.filter(item => item.category_id === cat.id).length !== 1 ? 's' : ''}
                         </span>
                       </td>
-                      {canEdit && cat.name.toLowerCase() !== 'add-ons' && cat.name.toLowerCase() !== 'complimentary' && (
+                      {canEdit && String(cat?.name ?? '').toLowerCase() !== 'add-ons' && String(cat?.name ?? '').toLowerCase() !== 'complimentary' && (
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
@@ -705,7 +709,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               >
                 <option value="">Select category</option>
-                {menuCategories.map(cat => (
+                {safeMenuCategories.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
@@ -767,7 +771,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                 onChange={(e) => setItemFormCategory(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
               >
-                {menuCategories.map(cat => (
+                {safeMenuCategories.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>

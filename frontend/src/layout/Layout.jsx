@@ -27,7 +27,11 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  const visibleNav = NAV_ITEMS.filter(item => !item.adminOnly || currentUser.role === 'admin')
+  const safeCurrentUser = currentUser || {}
+  const userRole = safeCurrentUser.role || 'staff'
+  const userName = safeCurrentUser.name || 'User'
+
+  const visibleNav = NAV_ITEMS.filter(item => !item.adminOnly || userRole === 'admin')
 
   const Sidebar = ({ mobile = false }) => {
     // Labels/text only collapse on the desktop rail — the mobile drawer always
@@ -117,11 +121,11 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
             </div>
             {showText && (
               <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-medium truncate">{currentUser.name}</p>
+                <p className="text-white text-xs font-medium truncate">{userName}</p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <Shield size={10} className={currentUser.role === 'admin' ? 'text-yellow-400' : 'text-gray-400'} />
-                  <span className={`text-xs capitalize ${currentUser.role === 'admin' ? 'text-yellow-400' : 'text-gray-400'}`}>
-                    {currentUser.role}
+                  <Shield size={10} className={userRole === 'admin' ? 'text-yellow-400' : 'text-gray-400'} />
+                  <span className={`text-xs capitalize ${userRole === 'admin' ? 'text-yellow-400' : 'text-gray-400'}`}>
+                    {userRole}
                   </span>
                 </div>
               </div>
@@ -190,10 +194,10 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
               onDismissAll={onDismissAllNotifications}
               onNotificationClick={onNotificationClick}
             />
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${currentUser.role === 'admin' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-              {currentUser.role === 'admin' ? 'Administrator' : 'Staff'}
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${userRole === 'admin' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+              {userRole === 'admin' ? 'Administrator' : 'Staff'}
             </span>
-            <span className="text-sm text-slate-600 font-medium hidden sm:block">{currentUser.name}</span>
+            <span className="text-sm text-slate-600 font-medium hidden sm:block">{userName}</span>
           </div>
         </header>
 

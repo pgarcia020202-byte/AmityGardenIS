@@ -65,7 +65,7 @@ function CountdownTimer({ checkInDate, durationMinutes = 30, onTimerEnd }) {
   )
 }
 
-function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
+function ExtendTimeModal({ bookings = [], rooms, onClose, onExtend }) {
   const [selectedBookingId, setSelectedBookingId] = useState('')
   const [extendHours, setExtendHours] = useState('')
   const [extraPrice, setExtraPrice] = useState('')
@@ -74,11 +74,13 @@ function ExtendTimeModal({ bookings, rooms, onClose, onExtend }) {
   const [roomSearch, setRoomSearch] = useState('')
   const [roomTypeFilter, setRoomTypeFilter] = useState('All')
 
-  const checkedInBookings = bookings.filter(b => b.status === 'Checked In')
+  const safeBookings = Array.isArray(bookings) ? bookings : []
+  const checkedInBookings = safeBookings.filter(b => b?.status === 'Checked In')
 
   const filteredBookings = checkedInBookings.filter(b => {
-    const matchesSearch = (b.room_number || '').toLowerCase().includes(roomSearch.toLowerCase())
-    const matchesType = roomTypeFilter === 'All' || b.room_type === roomTypeFilter
+    const roomNumber = String(b?.room_number ?? '')
+    const matchesSearch = roomNumber.toLowerCase().includes(roomSearch.toLowerCase())
+    const matchesType = roomTypeFilter === 'All' || b?.room_type === roomTypeFilter
     return matchesSearch && matchesType
   })
   const selectedBooking = checkedInBookings.find(b => b.id === selectedBookingId)
@@ -1708,20 +1710,30 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     }
   }, [])
 
-  const availableRooms = rooms.filter(r => r.status === 'Available')
+  const safeRooms = Array.isArray(rooms) ? rooms : []
+  const safeMenuItems = Array.isArray(menuItems) ? menuItems : []
+  const safeMenuCategories = Array.isArray(menuCategories) ? menuCategories : []
+
+  const availableRooms = safeRooms.filter(r => r?.status === 'Available')
 
   const filteredAvailableRooms = availableRooms.filter(r => {
-    const matchesSearch = r.room_number.toLowerCase().includes(roomSearch.toLowerCase())
-    const matchesType = roomTypeFilter === 'All' || r.room_type === roomTypeFilter
+    const roomNumber = String(r?.room_number ?? '')
+    const matchesSearch = roomNumber.toLowerCase().includes(roomSearch.toLowerCase())
+    const matchesType = roomTypeFilter === 'All' || r?.room_type === roomTypeFilter
     return matchesSearch && matchesType
   })
 
-  const addonsCategory = menuCategories.find(c => c.name.toLowerCase() === 'add-ons')
-  const addonsItems = addonsCategory 
-    ? menuItems.filter(item => item.category_id === addonsCategory.id)
+  const addonsCategory = safeMenuCategories.find(c => String(c?.name ?? '').toLowerCase() === 'add-ons')
+  const addonsItems = addonsCategory
+    ? safeMenuItems.filter(item => item?.category_id === addonsCategory.id)
     : []
-  const orderItems = menuItems.filter(item => item.category_id !== addonsCategory?.id)
-  const complimentaryItems = menuItems.filter(item => item.category_id !== addonsCategory?.id)
+  const addonsCategoryId = addonsCategory?.id
+  const orderItems = addonsCategoryId == null
+    ? safeMenuItems
+    : safeMenuItems.filter(item => String(item?.category_id ?? '') !== String(addonsCategoryId))
+  const complimentaryItems = addonsCategoryId == null
+    ? safeMenuItems
+    : safeMenuItems.filter(item => String(item?.category_id ?? '') !== String(addonsCategoryId))
 
   // Calculate order total price
   const orderTotal = useMemo(() => {
@@ -1753,8 +1765,10 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
 
   const filtered = bookings
     .filter(b => {
-      const matchesSearch = (b.guest_name || '').toLowerCase().includes(search.toLowerCase()) ||
-                           (b.room_number || '').toLowerCase().includes(search.toLowerCase())
+      const guestName = String(b?.guest_name ?? '')
+    const roomNumber = String(b?.room_number ?? '')
+    const matchesSearch = guestName.toLowerCase().includes(search.toLowerCase()) ||
+                           roomNumber.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === 'All' || b.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -1888,7 +1902,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     }
   }
 
-  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
+  const canManage = currentUser?.role === 'admin' || currentUser?.role === 'staff'
 
   const formatDate = (dateString) => {
     if (!dateString) return '-'

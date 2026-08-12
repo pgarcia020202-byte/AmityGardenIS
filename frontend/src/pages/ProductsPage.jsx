@@ -37,8 +37,11 @@ export default function Products({ products, categories, currentUser, onAdd, onE
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const filtered = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
+  const safeProducts = Array.isArray(products) ? products : []
+  const safeCategories = Array.isArray(categories) ? categories : []
+
+  const filtered = safeProducts.filter(p => {
+    const matchesSearch = String(p?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter === 'all' || p.category_id === categoryFilter
     const status = getProductStatus(p)
     const matchesStatus = statusFilter === 'all' || status === statusFilter
@@ -71,7 +74,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
     if (isNaN(currentStock) || currentStock < 0) { setError('Valid stock quantity is required.'); return }
     if (isNaN(minStock) || minStock < 0) { setError('Valid minimum stock is required.'); return }
 
-    const existingProduct = products.find(p => p.name.toLowerCase() === name.toLowerCase())
+    const existingProduct = safeProducts.find(p => String(p?.name ?? '').toLowerCase() === name.toLowerCase())
     if (existingProduct) {
       setError('A product with this name already exists.')
       return
@@ -154,7 +157,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
     setError('')
   }
 
-  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
+  const canManage = currentUser?.role === 'admin' || currentUser?.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">
@@ -190,7 +193,7 @@ export default function Products({ products, categories, currentUser, onAdd, onE
                 className="px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               >
                 <option value="all">All Categories</option>
-                {categories.map(c => (
+                {safeCategories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>

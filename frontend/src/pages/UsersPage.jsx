@@ -29,9 +29,11 @@ export default function Users({ users, onAdd, onUpdate, onDelete }) {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('staff')
 
-  const filtered = users.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.username.toLowerCase().includes(search.toLowerCase())
+  const safeUsers = Array.isArray(users) ? users : []
+
+  const filtered = safeUsers.filter(u =>
+    String(u?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(u?.username ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   async function handleAdd() {
@@ -106,7 +108,7 @@ export default function Users({ users, onAdd, onUpdate, onDelete }) {
       <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-sm text-slate-500 mt-0.5">{users.length} users total</p>
+            <p className="text-sm text-slate-500 mt-0.5">{safeUsers.length} users total</p>
           </div>
           <div className="flex flex-row gap-3">
             <div className="relative flex-1">

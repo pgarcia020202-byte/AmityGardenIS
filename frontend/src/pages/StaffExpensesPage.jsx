@@ -65,14 +65,16 @@ function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm,
 }
 
 function ExpenseDetailsModal({ viewTarget, products, currentUser, onClose, onSave, onDelete }) {
-  const [items, setItems] = useState(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+  const initialItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
+  const [items, setItems] = useState(initialItems.map(i => ({ ...i, originalQty: i.qty })))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [modalError, setModalError] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
-    setItems(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+    const nextItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
+    setItems(nextItems.map(i => ({ ...i, originalQty: i.qty })))
     setModalError('')
   }, [viewTarget])
 
@@ -123,11 +125,12 @@ function ExpenseDetailsModal({ viewTarget, products, currentUser, onClose, onSav
   
   const busy = saving || deleting
 
+  const originalItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
   const hasChanges = items.some(item => {
-    const originalItem = viewTarget.items.find(orig => orig.productId === item.productId)
+    const originalItem = originalItems.find(orig => orig.productId === item.productId)
     if (!originalItem) return true
     return item.qty !== originalItem.qty || item.unitPrice !== originalItem.unitPrice
-  }) || items.length !== viewTarget.items.length
+  }) || items.length !== originalItems.length
 
   async function handleSaveClick() {
     if (!hasChanges) {
@@ -176,7 +179,7 @@ function ExpenseDetailsModal({ viewTarget, products, currentUser, onClose, onSav
           <span>{formatDate(viewTarget.date)}</span>
         </div>
         <div className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
+          <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name || 'Unknown staff'}
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
@@ -301,6 +304,8 @@ function ExpenseDetailsModal({ viewTarget, products, currentUser, onClose, onSav
 }
 
 export default function StaffExpensesPage({ expenses = [], products, categories, currentUser, onAdd, onEdit, onDelete }) {
+  const safeExpenses = Array.isArray(expenses) ? expenses : []
+  const safeProducts = Array.isArray(products) ? products : []
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
@@ -320,10 +325,11 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
 
-  const filtered = expenses.filter(expense => {
+  const filtered = safeExpenses.filter(expense => {
+    const expenseItems = Array.isArray(expense?.items) ? expense.items : []
     const matchesSearch =
-      expense.user_name?.toLowerCase().includes(search.toLowerCase()) ||
-      expense.items?.some(i => i.productName.toLowerCase().includes(search.toLowerCase()))
+      String(expense?.user_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      expenseItems.some(i => String(i?.productName ?? '').toLowerCase().includes(search.toLowerCase()))
     const expenseDate = new Date(expense.date).setHours(0, 0, 0, 0)
     const matchesStartDate = !startDate || expenseDate >= new Date(startDate).setHours(0, 0, 0, 0)
     const matchesEndDate = !endDate || expenseDate <= new Date(endDate).setHours(23, 59, 59, 999)
@@ -345,7 +351,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
     }
 
     for (const item of cart) {
-      const product = products.find(p => p.id === item.productId)
+      const product = safeProducts.find(p => p.id === item.productId)
       if (!product) {
         setError('One or more products are no longer available.')
         return
@@ -357,7 +363,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
     }
 
     const items = cart.map(item => {
-      const product = products.find(p => p.id === item.productId)
+      const product = safeProducts.find(p => p.id === item.productId)
       if (!product) throw new Error('Product not found')
       return {
         productId: product.id,
@@ -373,8 +379,8 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
     setLoading(true)
     try {
       await onAdd({
-        user_id: currentUser.id,
-        user_name: currentUser.name,
+        user_id: currentUser?.id ?? null,
+        user_name: currentUser?.name ?? 'Staff',
         items,
         total
       })
@@ -424,7 +430,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
     const rowHeight = 7
     const headerHeight = 10
 
-    const filteredData = expenses.filter(expense => {
+    const filteredData = safeExpenses.filter(expense => {
       const expenseDate = new Date(expense.date).setHours(0, 0, 0, 0)
       const matchesStartDate = !startDate || expenseDate >= new Date(startDate).setHours(0, 0, 0, 0)
       const matchesEndDate = !endDate || expenseDate <= new Date(endDate).setHours(23, 59, 59, 999)
@@ -479,8 +485,9 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
       let currentY = yPos + headerHeight
       pageData.forEach((expense, i) => {
         xPos = margin
+        const expenseItems = Array.isArray(expense?.items) ? expense.items : []
 
-        const itemsText = expense.items.map(item => `${item.productName} x${item.qty}`).join(', ')
+        const itemsText = expenseItems.map(item => `${item.productName || 'Unknown item'} x${item.qty || 0}`).join(', ')
         const splitItems = doc.splitTextToSize(itemsText, colWidths[3])
         const lines = splitItems.length
         const dynamicRowHeight = Math.max(rowHeight, lines * 4)
@@ -491,14 +498,14 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
         doc.text(formatDate(expense.date), xPos, currentY)
         xPos += colWidths[1]
 
-        doc.text(expense.user_name, xPos, currentY)
+        doc.text(expense.user_name || 'Unknown staff', xPos, currentY)
         xPos += colWidths[2]
 
         doc.text(itemsText, xPos, currentY, { maxWidth: colWidths[3] })
         xPos += colWidths[3]
 
         doc.setFont('helvetica', 'bold')
-        doc.text('PHP ' + expense.total.toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
+        doc.text('PHP ' + (Number(expense.total) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
         doc.setFont('helvetica', 'normal')
 
         currentY += dynamicRowHeight
@@ -529,7 +536,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
   const totalAmount = filtered.reduce((sum, exp) => sum + (parseFloat(exp.total) || 0), 0)
 
   const cartTotal = cart.reduce((sum, item) => {
-    const product = products.find(p => p.id === item.productId)
+    const product = safeProducts.find(p => p.id === item.productId)
     return sum + (product ? product.price * item.qty : 0)
   }, 0)
 
@@ -538,7 +545,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
       <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-sm text-slate-500 mt-0.5">{expenses.length} expenses total</p>
+            <p className="text-sm text-slate-500 mt-0.5">{safeExpenses.length} expenses total</p>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-row gap-3">
@@ -551,7 +558,7 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
                   className="pl-9 pr-4 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
                 />
               </div>
-              {(currentUser.role === 'admin' || currentUser.role === 'staff') && (
+              {(currentUser?.role === 'admin' || currentUser?.role === 'staff') && (
                 <button
                   onClick={() => { setCart([]); setProductSearch(''); setCategoryFilter(''); setError(''); setAddOpen(true) }}
                   className="group flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 hover:shadow-lg hover:shadow-yellow-500/25 text-black px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-all duration-200 shrink-0"
@@ -599,31 +606,34 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
             {search ? 'No expenses match your search.' : 'No expenses yet.'}
           </div>
         )}
-        {paginated.map((expense, i) => (
-          <div key={expense.id} className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800">{expense.user_name}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Clock size={11} className="text-slate-400 shrink-0" />
-                  <p className="text-xs text-slate-400">{formatDate(expense.date)}</p>
+        {paginated.map((expense, i) => {
+          const expenseItems = Array.isArray(expense?.items) ? expense.items : []
+          return (
+            <div key={expense.id} className="bg-white rounded-xl border border-slate-200 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{expense.user_name || 'Unknown staff'}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Clock size={11} className="text-slate-400 shrink-0" />
+                    <p className="text-xs text-slate-400">{formatDate(expense.date)}</p>
+                  </div>
                 </div>
+                <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(expense.total || 0)}</span>
               </div>
-              <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(expense.total)}</span>
+              <p className="text-xs text-slate-400 mt-2 truncate">
+                {expenseItems.length} item{expenseItems.length !== 1 ? 's' : ''} — {expenseItems.map(i => i.productName || 'Unknown item').join(', ')}
+              </p>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => setViewTarget(expense)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
+                >
+                  <Eye size={13} /> View
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-slate-400 mt-2 truncate">
-              {expense.items.length} item{expense.items.length !== 1 ? 's' : ''} — {expense.items.map(i => i.productName).join(', ')}
-            </p>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => setViewTarget(expense)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
-              >
-                <Eye size={13} /> View
-              </button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Tablet / desktop: table */}
@@ -647,38 +657,41 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
                   </td>
                 </tr>
               )}
-              {paginated.map((expense) => (
-                <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <Clock size={13} className="text-slate-400" />
-                      <span className="text-sm text-slate-600">{formatDate(expense.date)}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{expense.user_name}</td>
-                  <td className="px-5 py-3.5">
-                    <div className="text-sm text-slate-600">
-                      {expense.items.length} item{expense.items.length !== 1 ? 's' : ''}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-0.5 truncate max-w-32">
-                      {expense.items.map(i => i.productName).join(', ')}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(expense.total)}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => setViewTarget(expense)}
-                      className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
-                      title="View"
-                    >
-                      <Eye size={13} className="group-hover:scale-110 transition-transform" />
-                      <span className="hidden lg:inline">View</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {paginated.map((expense) => {
+                const expenseItems = Array.isArray(expense?.items) ? expense.items : []
+                return (
+                  <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <Clock size={13} className="text-slate-400" />
+                        <span className="text-sm text-slate-600">{formatDate(expense.date)}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{expense.user_name || 'Unknown staff'}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="text-sm text-slate-600">
+                        {expenseItems.length} item{expenseItems.length !== 1 ? 's' : ''}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5 truncate max-w-32">
+                        {expenseItems.map(i => i.productName || 'Unknown item').join(', ')}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(expense.total || 0)}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => setViewTarget(expense)}
+                        className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
+                        title="View"
+                      >
+                        <Eye size={13} className="group-hover:scale-110 transition-transform" />
+                        <span className="hidden lg:inline">View</span>
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -745,9 +758,9 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
                   <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 text-center py-4">Please select a category to view products</p>
                 ) : (
                   <>
-                    {products.filter(p => 
-                      p.current_stock > 0 &&
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
+                    {safeProducts.filter(p => 
+                      Number(p?.current_stock || 0) > 0 &&
+                      String(p?.name ?? '').toLowerCase().includes(productSearch.toLowerCase()) &&
                       (categoryFilter === 'all' || p.category_id === categoryFilter)
                     ).map(product => (
                       <button
@@ -762,9 +775,9 @@ export default function StaffExpensesPage({ expenses = [], products, categories,
                         <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(product.price)}</span>
                       </button>
                     ))}
-                    {products.filter(p => 
-                      p.current_stock > 0 &&
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
+                    {safeProducts.filter(p => 
+                      Number(p?.current_stock || 0) > 0 &&
+                      String(p?.name ?? '').toLowerCase().includes(productSearch.toLowerCase()) &&
                       (categoryFilter === 'all' || p.category_id === categoryFilter)
                     ).length === 0 && (
                       <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 text-center py-4">No products match your filters</p>

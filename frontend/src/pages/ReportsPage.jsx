@@ -103,50 +103,56 @@ export default function Reports({ products, sales, categories, rooms, bookings }
   const [activeTab, setActiveTab] = useState('inventory')
   const isMobile = useIsMobile()
 
+  const safeProducts = Array.isArray(products) ? products : []
+  const safeSales = Array.isArray(sales) ? sales : []
+  const safeCategories = Array.isArray(categories) ? categories : []
+
   const rangeDays = getRangeDays(timeRange)
 
   const filteredSales = useMemo(() => {
     const start = getRangeStart(timeRange)
     const end = getRangeEnd(timeRange)
-    return sales.filter(s => {
+    return safeSales.filter(s => {
       const saleDate = toPhilippinesTime(new Date(s.date))
       return saleDate >= start && saleDate <= end
     })
-  }, [sales, timeRange])
+  }, [safeSales, timeRange])
 
   const salesByCategory = useMemo(() => {
-    return categories
+    return safeCategories
       .map(cat => {
         const categorySales = filteredSales.reduce((total, sale) => {
-          const categoryItems = sale.items.filter(item => {
-            const product = products.find(p => p.id === item.productId)
+          const saleItems = Array.isArray(sale?.items) ? sale.items : []
+          const categoryItems = saleItems.filter(item => {
+            const product = safeProducts.find(p => p.id === item.productId)
             return product?.category_id === cat.id
           })
-          return total + categoryItems.reduce((sum, item) => sum + item.subtotal, 0)
+          return total + categoryItems.reduce((sum, item) => sum + (Number(item.subtotal) || 0), 0)
         }, 0)
         return { name: cat.name, value: categorySales }
       })
       .filter(item => item.value > 0)
-  }, [categories, filteredSales, products])
+  }, [safeCategories, filteredSales, safeProducts])
 
   const topProducts = useMemo(() => {
     const soldByProduct = new Map()
     for (const sale of filteredSales) {
-      for (const item of sale.items) {
-        soldByProduct.set(item.productId, (soldByProduct.get(item.productId) ?? 0) + item.qty)
+      const saleItems = Array.isArray(sale?.items) ? sale.items : []
+      for (const item of saleItems) {
+        soldByProduct.set(item.productId, (soldByProduct.get(item.productId) ?? 0) + (Number(item.qty) || 0))
       }
     }
 
-    return [...products]
+    return [...safeProducts]
       .map(p => ({
         name: p.name,
         sold: soldByProduct.get(p.id) ?? 0,
-        revenue: (soldByProduct.get(p.id) ?? 0) * p.price,
+        revenue: (soldByProduct.get(p.id) ?? 0) * (Number(p.price) || 0),
       }))
       .filter(p => p.sold > 0)
       .sort((a, b) => b.sold - a.sold)
       .slice(0, 10)
-  }, [products, filteredSales])
+  }, [safeProducts, filteredSales])
 
   const salesOverTime = useMemo(() => {
     // Hourly data for today and yesterday

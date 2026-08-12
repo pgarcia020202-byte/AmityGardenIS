@@ -46,19 +46,26 @@ function relTime(iso) {
 export default function Dashboard({ categories, products, sales, stockLogs, rooms, bookings, onNavigate }) {
   const [activeTab, setActiveTab] = useState('inventory')
 
-  const totalStock = products.reduce((s, p) => s + p.current_stock, 0)
-  const totalSold = products.reduce((s, p) => s + p.total_sold, 0)
-  const lowStock = products.filter(p => getProductStatus(p) === 'Low Stock').length
-  const outOfStock = products.filter(p => getProductStatus(p) === 'Out of Stock').length
+  const safeCategories = Array.isArray(categories) ? categories : []
+  const safeProducts = Array.isArray(products) ? products : []
+  const safeSales = Array.isArray(sales) ? sales : []
+  const safeStockLogs = Array.isArray(stockLogs) ? stockLogs : []
+  const safeRooms = Array.isArray(rooms) ? rooms : []
+  const safeBookings = Array.isArray(bookings) ? bookings : []
+
+  const totalStock = safeProducts.reduce((s, p) => s + (Number(p?.current_stock) || 0), 0)
+  const totalSold = safeProducts.reduce((s, p) => s + (Number(p?.total_sold) || 0), 0)
+  const lowStock = safeProducts.filter(p => getProductStatus(p) === 'Low Stock').length
+  const outOfStock = safeProducts.filter(p => getProductStatus(p) === 'Out of Stock').length
 
   // Hotel stats
-  const totalRooms = rooms.length
-  const availableRooms = rooms.filter(r => r.status === 'Available').length
-  const occupiedRooms = rooms.filter(r => r.status === 'Occupied').length
-  const cleaningRooms = rooms.filter(r => r.status === 'Cleaning').length
-  const checkedInBookings = bookings.filter(b => b.status === 'Checked In').length
-  const checkedOutBookings = bookings.filter(b => b.status === 'Checked Out').length
-  const todayHotelRevenue = bookings
+  const totalRooms = safeRooms.length
+  const availableRooms = safeRooms.filter(r => r.status === 'Available').length
+  const occupiedRooms = safeRooms.filter(r => r.status === 'Occupied').length
+  const cleaningRooms = safeRooms.filter(r => r.status === 'Cleaning').length
+  const checkedInBookings = safeBookings.filter(b => b.status === 'Checked In').length
+  const checkedOutBookings = safeBookings.filter(b => b.status === 'Checked Out').length
+  const todayHotelRevenue = safeBookings
     .filter(b => {
       const d = new Date(b.check_in_date)
       const now = new Date()
@@ -69,10 +76,10 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
     })
     .reduce((s, b) => s + parseFloat(b.price || 0), 0)
 
-  const recentSales = [...sales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
-  const recentLogs = [...stockLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+  const recentSales = [...safeSales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+  const recentLogs = [...safeStockLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
 
-  const todaySales = sales.filter(s => {
+  const todaySales = safeSales.filter(s => {
     const d = new Date(s.date)
     const now = new Date()
     // Convert to Philippines timezone using proper timezone conversion
@@ -117,13 +124,13 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
           <StatCard
             icon={<Package size={18} className="text-violet-600" />}
             label="Total Products"
-            value={products.length}
+            value={safeProducts.length}
             color="bg-violet-50"
           />
           <StatCard
             icon={<Tag size={18} className="text-sky-600" />}
             label="Categories"
-            value={categories.length}
+            value={safeCategories.length}
             color="bg-sky-50"
           />
           <StatCard
@@ -186,28 +193,31 @@ export default function Dashboard({ categories, products, sales, stockLogs, room
               {recentSales.length === 0 && (
                 <p className="px-5 py-6 text-xs sm:text-sm text-slate-400 text-center">No sales yet</p>
               )}
-              {recentSales.map(sale => (
-                <div key={sale.id} className="px-3 sm:px-5 py-2.5 sm:py-3.5 flex items-start justify-between gap-2 sm:gap-3 hover:bg-slate-50">
-                  <div className="flex items-start gap-2 sm:gap-3 min-w-0">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
-                      <ShoppingBag size={12} className="text-indigo-500" />
+              {recentSales.map(sale => {
+                const saleItems = Array.isArray(sale?.items) ? sale.items : []
+                return (
+                  <div key={sale.id} className="px-3 sm:px-5 py-2.5 sm:py-3.5 flex items-start justify-between gap-2 sm:gap-3 hover:bg-slate-50">
+                    <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
+                        <ShoppingBag size={12} className="text-indigo-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-slate-800 truncate">{sale.user_name}</p>
+                        <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
+                          {saleItems.length} item{saleItems.length !== 1 ? 's' : ''} — {saleItems.map(i => i.productName).join(', ')}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-slate-800 truncate">{sale.user_name}</p>
-                      <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
-                        {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} — {sale.items.map(i => i.productName).join(', ')}
-                      </p>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs sm:text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total)}</p>
+                      <div className="flex items-center gap-1 justify-end mt-0.5">
+                        <Clock size={9} className="text-slate-400" />
+                        <p className="text-[10px] sm:text-xs text-slate-400">{relTime(sale.date)}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs sm:text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total)}</p>
-                    <div className="flex items-center gap-1 justify-end mt-0.5">
-                      <Clock size={9} className="text-slate-400" />
-                      <p className="text-[10px] sm:text-xs text-slate-400">{relTime(sale.date)}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

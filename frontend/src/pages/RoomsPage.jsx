@@ -32,10 +32,12 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const filtered = rooms
+  const safeRooms = Array.isArray(rooms) ? rooms : []
+
+  const filtered = safeRooms
     .filter(r => {
-      const matchesSearch = (r.room_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
-                           (r.room_type?.toLowerCase() || '').includes(search.toLowerCase())
+      const matchesSearch = (String(r?.room_number ?? '')).toLowerCase().includes(search.toLowerCase()) ||
+                           (String(r?.room_type ?? '')).toLowerCase().includes(search.toLowerCase())
       const matchesType = typeFilter === 'All' || r.room_type === typeFilter
       const matchesStatus = statusFilter === 'All' || r.status === statusFilter
       return matchesSearch && matchesType && matchesStatus
@@ -87,7 +89,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
       setError('Room type must be Standard, Family, or Barkada.'); return
     }
     if (!formData.capacity || formData.capacity <= 0) { setError('Capacity must be greater than 0.'); return }
-    if (rooms.some(r => r.room_number.toLowerCase() === roomNumber.toLowerCase())) {
+    if (safeRooms.some(r => String(r?.room_number ?? '').toLowerCase() === roomNumber.toLowerCase())) {
       setError('A room with this number already exists.'); return
     }
     setLoading(true)
@@ -119,7 +121,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
       setError('Room type must be Standard, Family, or Barkada.'); return
     }
     if (!formData.capacity || formData.capacity <= 0) { setError('Capacity must be greater than 0.'); return }
-    if (rooms.some(r => r.room_number.toLowerCase() === roomNumber.toLowerCase() && r.id !== editTarget.id)) {
+    if (safeRooms.some(r => String(r?.room_number ?? '').toLowerCase() === roomNumber.toLowerCase() && r.id !== editTarget.id)) {
       setError('A room with this number already exists.'); return
     }
     setLoading(true)
@@ -147,7 +149,7 @@ export default function RoomsPage({ rooms, currentUser, onAdd, onEdit, onDelete 
     setDeleteTarget(null)
   }
 
-  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
+  const canManage = currentUser?.role === 'admin' || currentUser?.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">

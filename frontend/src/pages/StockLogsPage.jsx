@@ -53,10 +53,12 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
   const [deletingLogId, setDeletingLogId] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
-  const filtered = stockLogs.filter(log => {
+  const safeStockLogs = Array.isArray(stockLogs) ? stockLogs : []
+
+  const filtered = safeStockLogs.filter(log => {
     const matchesSearch =
-      log.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      log.user_name.toLowerCase().includes(search.toLowerCase())
+      String(log?.product_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(log?.user_name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesType = typeFilter === 'all' || log.type === typeFilter
     const logDate = new Date(log.date).setHours(0, 0, 0, 0)
     const matchesStartDate = !startDate || logDate >= new Date(startDate).setHours(0, 0, 0, 0)
@@ -140,10 +142,10 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
     const headerHeight = 10
 
     // Filter data by date range and type
-    const filteredData = stockLogs.filter(log => {
+    const filteredData = safeStockLogs.filter(log => {
       const matchesSearch =
-        log.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        log.user_name.toLowerCase().includes(search.toLowerCase())
+        String(log?.product_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        String(log?.user_name ?? '').toLowerCase().includes(search.toLowerCase())
       const matchesType = typeFilter === 'all' || log.type === typeFilter
       const logDate = new Date(log.date).setHours(0, 0, 0, 0)
       const matchesStartDate = !startDate || logDate >= new Date(startDate).setHours(0, 0, 0, 0)

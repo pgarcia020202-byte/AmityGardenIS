@@ -75,14 +75,16 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
   // the quantity already reserved by this sale. product.current_stock is
   // assumed to be the live stock (after the sale was created), so allowed max
   // = current_stock + originalQty.
-  const [items, setItems] = useState(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+  const initialItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
+  const [items, setItems] = useState(initialItems.map(i => ({ ...i, originalQty: i.qty })))
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [modalError, setModalError] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
-    setItems(viewTarget.items.map(i => ({ ...i, originalQty: i.qty })))
+    const nextItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
+    setItems(nextItems.map(i => ({ ...i, originalQty: i.qty })))
     setModalError('')
   }, [viewTarget])
 
@@ -134,11 +136,12 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
   const busy = saving || deleting
 
   // Check if any items have changed from their original quantities
+  const originalItems = Array.isArray(viewTarget?.items) ? viewTarget.items : []
   const hasChanges = items.some(item => {
-    const originalItem = viewTarget.items.find(orig => orig.productId === item.productId)
+    const originalItem = originalItems.find(orig => orig.productId === item.productId)
     if (!originalItem) return true // New item added
     return item.qty !== originalItem.qty || item.unitPrice !== originalItem.unitPrice
-  }) || items.length !== viewTarget.items.length // Check if items were removed
+  }) || items.length !== originalItems.length // Check if items were removed
 
   async function handleSaveClick() {
     if (!hasChanges) {
@@ -189,7 +192,7 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
         <span>{formatDate(viewTarget.date)}</span>
       </div>
       <div className="text-sm text-slate-600">
-        <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name}
+        <span className="font-medium text-slate-900">Processed by:</span> {viewTarget.user_name || 'Unknown cashier'}
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">Items:</label>
@@ -318,6 +321,8 @@ function SaleDetailsModal({ viewTarget, products, currentUser, onClose, onSave, 
 }
 
 export default function Sales({ sales, products, categories, currentUser, onAdd, onEdit, onDelete, onForceEdit }) {
+  const safeSales = Array.isArray(sales) ? sales : []
+  const safeProducts = Array.isArray(products) ? products : []
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
@@ -337,10 +342,11 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   const [loading, setLoading] = useState(false)
   const itemsPerPage = 10
 
-  const filtered = sales.filter(s => {
+  const filtered = safeSales.filter(s => {
+    const saleItems = Array.isArray(s?.items) ? s.items : []
     const matchesSearch =
-      s.user_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.items.some(i => i.productName.toLowerCase().includes(search.toLowerCase()))
+      String(s?.user_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      saleItems.some(i => String(i?.productName ?? '').toLowerCase().includes(search.toLowerCase()))
     const saleDate = new Date(s.date).setHours(0, 0, 0, 0)
     const matchesStartDate = !startDate || saleDate >= new Date(startDate).setHours(0, 0, 0, 0)
     const matchesEndDate = !endDate || saleDate <= new Date(endDate).setHours(23, 59, 59, 999)
@@ -374,7 +380,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
     }
 
     const items = cart.map(item => {
-      const product = products.find(p => p.id === item.productId)
+      const product = safeProducts.find(p => p.id === item.productId)
       if (!product) throw new Error('Product not found')
       return {
         productId: product.id,
@@ -390,8 +396,8 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
     setLoading(true)
     try {
       await onAdd({
-        user_id: currentUser.id,
-        user_name: currentUser.name,
+        user_id: currentUser?.id ?? null,
+        user_name: currentUser?.name ?? 'Staff',
         items,
         total
       })
@@ -443,7 +449,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
     const headerHeight = 10
 
     // Filter data by date range
-    const filteredData = sales.filter(s => {
+    const filteredData = safeSales.filter(s => {
       const saleDate = new Date(s.date).setHours(0, 0, 0, 0)
       const matchesStartDate = !startDate || saleDate >= new Date(startDate).setHours(0, 0, 0, 0)
       const matchesEndDate = !endDate || saleDate <= new Date(endDate).setHours(23, 59, 59, 999)
@@ -502,9 +508,10 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       let currentY = yPos + headerHeight
       pageData.forEach((sale, i) => {
         xPos = margin
+        const saleItems = Array.isArray(sale?.items) ? sale.items : []
 
         // Calculate row height based on wrapped items text
-        const itemsText = sale.items.map(item => `${item.productName} x${item.qty}`).join(', ')
+        const itemsText = saleItems.map(item => `${item.productName || 'Unknown item'} x${item.qty || 0}`).join(', ')
         const splitItems = doc.splitTextToSize(itemsText, colWidths[3])
         const lines = splitItems.length
         const dynamicRowHeight = Math.max(rowHeight, lines * 4)
@@ -518,7 +525,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
         xPos += colWidths[1]
 
         // Cashier
-        doc.text(sale.user_name, xPos, currentY)
+        doc.text(sale.user_name || 'Unknown cashier', xPos, currentY)
         xPos += colWidths[2]
 
         // Items (with wrapping)
@@ -527,7 +534,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
 
         // Total (aligned to top of row)
         doc.setFont('helvetica', 'bold')
-        doc.text('PHP ' + sale.total.toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
+        doc.text('PHP ' + (Number(sale.total) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
         doc.setFont('helvetica', 'normal')
 
         currentY += dynamicRowHeight
@@ -554,7 +561,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
   }
 
   const cartTotal = cart.reduce((sum, item) => {
-    const product = products.find(p => p.id === item.productId)
+    const product = safeProducts.find(p => p.id === item.productId)
     return sum + (product ? product.price * item.qty : 0)
   }, 0)
 
@@ -563,7 +570,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       <div className="sticky top-0 z-10 bg-white px-4 pb-4 shadow-md mb-5 sm:mb-6 -mx-4 sm:mx-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-sm text-slate-500 mt-0.5">{sales.length} transactions total</p>
+            <p className="text-sm text-slate-500 mt-0.5">{safeSales.length} transactions total</p>
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-row gap-3">
@@ -622,31 +629,34 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
             {search ? 'No sales match your search.' : 'No sales yet.'}
           </div>
         )}
-        {paginated.map((sale, i) => (
-          <div key={sale.id} className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800">{sale.user_name}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Clock size={11} className="text-slate-400 shrink-0" />
-                  <p className="text-xs text-slate-400">{formatDate(sale.date)}</p>
+        {paginated.map((sale, i) => {
+          const saleItems = Array.isArray(sale?.items) ? sale.items : []
+          return (
+            <div key={sale.id} className="bg-white rounded-xl border border-slate-200 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{sale.user_name || 'Unknown cashier'}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Clock size={11} className="text-slate-400 shrink-0" />
+                    <p className="text-xs text-slate-400">{formatDate(sale.date)}</p>
+                  </div>
                 </div>
+                <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(sale.total || 0)}</span>
               </div>
-              <span className="text-sm font-semibold text-slate-900 font-mono shrink-0">{formatCurrency(sale.total)}</span>
+              <p className="text-xs text-slate-400 mt-2 truncate">
+                {saleItems.length} item{saleItems.length !== 1 ? 's' : ''} — {saleItems.map(i => i.productName || 'Unknown item').join(', ')}
+              </p>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => setViewTarget(sale)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
+                >
+                  <Eye size={13} /> View
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-slate-400 mt-2 truncate">
-              {sale.items.length} item{sale.items.length !== 1 ? 's' : ''} — {sale.items.map(i => i.productName).join(', ')}
-            </p>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-              <button
-                onClick={() => setViewTarget(sale)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
-              >
-                <Eye size={13} /> View
-              </button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Tablet / desktop: table */}
@@ -670,38 +680,41 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                   </td>
                 </tr>
               )}
-              {paginated.map((sale) => (
-                <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <Clock size={13} className="text-slate-400" />
-                      <span className="text-sm text-slate-600">{formatDate(sale.date)}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{sale.user_name}</td>
-                  <td className="px-5 py-3.5">
-                    <div className="text-sm text-slate-600">
-                      {sale.items.length} item{sale.items.length !== 1 ? 's' : ''}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-0.5 truncate max-w-32">
-                      {sale.items.map(i => i.productName).join(', ')}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total)}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => setViewTarget(sale)}
-                      className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
-                      title="View"
-                    >
-                      <Eye size={13} className="group-hover:scale-110 transition-transform" />
-                      <span className="hidden lg:inline">View</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {paginated.map((sale) => {
+                const saleItems = Array.isArray(sale?.items) ? sale.items : []
+                return (
+                  <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <Clock size={13} className="text-slate-400" />
+                        <span className="text-sm text-slate-600">{formatDate(sale.date)}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-slate-800 font-medium">{sale.user_name || 'Unknown cashier'}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="text-sm text-slate-600">
+                        {saleItems.length} item{saleItems.length !== 1 ? 's' : ''}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5 truncate max-w-32">
+                        {saleItems.map(i => i.productName || 'Unknown item').join(', ')}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <span className="text-sm font-semibold text-slate-900 font-mono">{formatCurrency(sale.total || 0)}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => setViewTarget(sale)}
+                        className="group inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200 ml-auto"
+                        title="View"
+                      >
+                        <Eye size={13} className="group-hover:scale-110 transition-transform" />
+                        <span className="hidden lg:inline">View</span>
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -768,9 +781,9 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                   <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 text-center py-4">Please select a category to view products</p>
                 ) : (
                   <>
-                    {products.filter(p => 
-                      p.current_stock > 0 &&
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
+                    {safeProducts.filter(p => 
+                      Number(p?.current_stock || 0) > 0 &&
+                      String(p?.name ?? '').toLowerCase().includes(productSearch.toLowerCase()) &&
                       (categoryFilter === 'all' || p.category_id === categoryFilter)
                     ).map(product => (
                       <button
@@ -785,9 +798,9 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
                         <span className="text-sm font-mono text-slate-900 shrink-0">{formatCurrency(product.price)}</span>
                       </button>
                     ))}
-                    {products.filter(p => 
-                      p.current_stock > 0 &&
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
+                    {safeProducts.filter(p => 
+                      Number(p?.current_stock || 0) > 0 &&
+                      String(p?.name ?? '').toLowerCase().includes(productSearch.toLowerCase()) &&
                       (categoryFilter === 'all' || p.category_id === categoryFilter)
                     ).length === 0 && (
                       <p className="text-sm text-slate-400 col-span-1 sm:col-span-2 text-center py-4">No products match your filters</p>

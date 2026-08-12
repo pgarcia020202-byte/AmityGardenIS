@@ -24,12 +24,15 @@ export default function Categories({ categories, products, currentUser, onAdd, o
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const filtered = categories.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  const safeCategories = Array.isArray(categories) ? categories : []
+  const safeProducts = Array.isArray(products) ? products : []
+
+  const filtered = safeCategories.filter(c =>
+    String(c?.name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   function productCount(catId) {
-    return products.filter(p => p.category_id === catId).length
+    return safeProducts.filter(p => p.category_id === catId).length
   }
 
   async function handleAdd(e) {
@@ -37,7 +40,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
     if (loading) return
     const name = formName.trim()
     if (!name) { setError('Category name is required.'); return }
-    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+    if (safeCategories.some(c => String(c?.name ?? '').toLowerCase() === name.toLowerCase())) {
       setError('A category with this name already exists.'); return
     }
     setLoading(true)
@@ -56,7 +59,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
     if (loading || !editTarget) return
     const name = formName.trim()
     if (!name) { setError('Category name is required.'); return }
-    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase() && c.id !== editTarget.id)) {
+    if (safeCategories.some(c => String(c?.name ?? '').toLowerCase() === name.toLowerCase() && c.id !== editTarget.id)) {
       setError('A category with this name already exists.'); return
     }
     setLoading(true)
@@ -76,7 +79,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
     setDeleteTarget(null)
   }
 
-  const canManage = currentUser.role === 'admin' || currentUser.role === 'staff'
+  const canManage = currentUser?.role === 'admin' || currentUser?.role === 'staff'
 
   return (
     <div className="p-4 sm:p-6">

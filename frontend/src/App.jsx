@@ -96,6 +96,7 @@ export default function App() {
   const SOCKET_URL = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'https://amitygardenis.onrender.com'
 
   const normalizeId = (value) => (value === undefined || value === null ? '' : String(value))
+  const ensureArray = (value) => (Array.isArray(value) ? value : [])
 
   useEffect(() => {
     async function loadData() {
@@ -111,7 +112,20 @@ export default function App() {
         await authAPI.verifyToken()
       } catch (error) {
         console.error('Token verification failed:', error)
-        handleLogout()
+
+        const isAuthFailure = (errorValue) => {
+          const message = errorValue?.message || ''
+          return message.includes('Unauthorized') ||
+            message.includes('Invalid token') ||
+            message.includes('Authentication error') ||
+            message.includes('401') ||
+            message.includes('403')
+        }
+
+        if (isAuthFailure(error)) {
+          handleLogout()
+        }
+
         setLoading(false)
         return
       }
@@ -144,63 +158,63 @@ export default function App() {
         }
 
         if (categoriesResult.status === 'fulfilled') {
-          setCategories(categoriesResult.value)
+          setCategories(ensureArray(categoriesResult.value))
         } else if (handleRejected(categoriesResult, 'categories')) {
           return
         }
-
+ 
         if (productsResult.status === 'fulfilled') {
-          setProducts(productsResult.value)
+          setProducts(ensureArray(productsResult.value))
         } else if (handleRejected(productsResult, 'products')) {
           return
         }
-
+ 
         if (salesResult.status === 'fulfilled') {
-          setSales(salesResult.value)
+          setSales(ensureArray(salesResult.value))
         } else if (handleRejected(salesResult, 'sales')) {
           return
         }
-
+ 
         if (logsResult.status === 'fulfilled') {
-          setStockLogs(logsResult.value)
+          setStockLogs(ensureArray(logsResult.value))
         } else if (handleRejected(logsResult, 'stock logs')) {
           return
         }
-
+ 
         if (roomsResult.status === 'fulfilled') {
-          setRooms(roomsResult.value)
+          setRooms(ensureArray(roomsResult.value))
         } else if (handleRejected(roomsResult, 'rooms')) {
           return
         }
-
+ 
         if (bookingsResult.status === 'fulfilled') {
-          setBookings(bookingsResult.value)
+          setBookings(ensureArray(bookingsResult.value))
         } else if (handleRejected(bookingsResult, 'bookings')) {
           return
         }
-
+ 
         if (expensesResult.status === 'fulfilled') {
-          setExpenses(expensesResult.value)
+          setExpenses(ensureArray(expensesResult.value))
         } else if (handleRejected(expensesResult, 'expenses')) {
           return
         }
-
+ 
         if (menuCategoriesResult.status === 'fulfilled') {
-          setMenuCategories(menuCategoriesResult.value)
+          setMenuCategories(ensureArray(menuCategoriesResult.value))
         } else if (handleRejected(menuCategoriesResult, 'menu categories')) {
           return
         }
-
+ 
         if (menuItemsResult.status === 'fulfilled') {
-          setMenuItems(menuItemsResult.value)
+          setMenuItems(ensureArray(menuItemsResult.value))
         } else if (handleRejected(menuItemsResult, 'menu items')) {
           return
         }
 
-        if (currentUser.role === 'admin') {
+        if (currentUser?.role === 'admin') {
           try {
             const usersData = await usersAPI.getAll()
-            setUsers(usersData)
+            setUsers(ensureArray(usersData))
           } catch (error) {
             console.error('Error loading users:', error)
             if (error?.message?.includes('Unauthorized') || error?.message?.includes('Invalid token') || error?.message?.includes('Authentication error') || error?.message?.includes('401') || error?.message?.includes('403')) {
@@ -214,7 +228,16 @@ export default function App() {
         }
       } catch (error) {
         console.error('Unexpected error during data loading:', error)
-        handleLogout()
+        const message = error?.message || ''
+        const isAuthFailure = message.includes('Unauthorized') ||
+          message.includes('Invalid token') ||
+          message.includes('Authentication error') ||
+          message.includes('401') ||
+          message.includes('403')
+
+        if (isAuthFailure) {
+          handleLogout()
+        }
       } finally {
         setLoading(false)
       }
@@ -1078,7 +1101,7 @@ export default function App() {
       case 'check-in-out':
         return <CheckInOutPage bookings={bookings} rooms={rooms} currentUser={currentUser} onCheckIn={handleCheckIn} onCheckOut={handleCheckOut} onUpdate={handleUpdateBooking} onDelete={handleDeleteBooking} onExtend={handleExtendBooking} highlightedBookingId={highlightedBookingId} onTimerEnd={handleTimerEnd} menuItems={menuItems} menuCategories={menuCategories} />
       case 'hotel-menus':
-        if (currentUser.role === 'admin') {
+       if (currentUser?.role === 'admin') {
           return <HotelMenusPage menuCategories={menuCategories} menuItems={menuItems} currentUser={currentUser} onAddCategory={handleAddMenuCategory} onEditCategory={handleEditMenuCategory} onDeleteCategory={handleDeleteMenuCategory} onAddItem={handleAddMenuItem} onEditItem={handleEditMenuItem} onDeleteItem={handleDeleteMenuItem} />
         }
         return null
