@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Archive, Clock, Download, Trash2, AlertCircle } from 'lucide-react'
 import jsPDF from 'jspdf'
+import { safeFormatDateTime } from '../utils/formatUtils'
 
 function ConfirmationModal({ title, message, confirmText, cancelText, onConfirm, onCancel, loading }) {
   return (
@@ -85,7 +86,7 @@ export default function StockLogs({ stockLogs, currentUser, onDelete }) {
       hour12: true,
       timeZone: 'Asia/Manila'
     }
-    return date.toLocaleString('en-PH', options)
+    return safeFormatDateTime(date, options)
   }
 
   function relTime(iso) {

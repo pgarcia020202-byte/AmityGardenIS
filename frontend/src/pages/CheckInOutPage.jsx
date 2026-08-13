@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Search, Plus, Pencil, Trash2, LogIn, LogOut, X, AlertCircle, Check, Bed, User, Phone, Mail, Users, Calendar, Eye, Clock, Timer, ClockPlus, Info, Package } from 'lucide-react'
+import { safeFormatDateTime } from '../utils/formatUtils'
 
 function Modal({ title, onClose, children }) {
   return (
@@ -692,7 +693,7 @@ function BookingDetailsModal({
 
     const date = new Date(dateString)
 
-    return date.toLocaleString('en-PH', {
+    return safeFormatDateTime(date, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -1906,7 +1907,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
 
   const formatDate = (dateString) => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleString('en-PH', {
+    return safeFormatDateTime(dateString, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

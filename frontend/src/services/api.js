@@ -1,7 +1,16 @@
 ﻿const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://amitygardenis.onrender.com/api'
 
 // Get stored token
-const getToken = () => localStorage.getItem('token')
+const getToken = () => {
+  try {
+    return localStorage.getItem('token')
+  } catch (error) {
+    // Some in-app browsers / privacy modes block storage access entirely
+    // and throw here instead of returning null. Treat as "no token".
+    console.warn('localStorage unavailable, continuing without token:', error)
+    return null
+  }
+}
 
 // Generic API call function with retry logic
 async function apiCall(endpoint, options = {}, retryCount = 0) {

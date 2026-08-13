@@ -15,9 +15,34 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Static placeholder shown until React mounts, so slow loads and
+         genuinely unsupported browsers don't look like a blank crash. */
+      #root:empty {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Inter, system-ui, sans-serif;
+        color: #64748b;
+        font-size: 14px;
+      }
+      #root:empty::after {
+        content: 'Loading…';
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Modern browsers: ES module bundle -->
     <script type="module" src="/src/main.jsx"></script>
+    <!-- @vitejs/plugin-legacy injects the nomodule fallback <script> tags
+         here automatically at build time for browsers without ES module
+         support. Nothing to add manually once the plugin is configured. -->
+    <noscript>
+      This app requires JavaScript to be enabled. Please enable JavaScript in
+      your browser settings, or try a different browser (e.g. Chrome or
+      Safari), and reload the page.
+    </noscript>
   </body>
 </html>

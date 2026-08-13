@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import React from 'react'
 import { Package, Tag, Archive, ShoppingBag, AlertTriangle, XCircle, TrendingUp, Clock, Bed, Users, Calendar, DoorOpen } from 'lucide-react'
+import { safeFormatCurrency, safeFormatNumber } from '../utils/formatUtils'
 
 function getProductStatus(product) {
   if (product.current_stock === 0) return 'Out of Stock'
@@ -25,7 +26,7 @@ function StatCard({ icon, label, value, color, sub }) {
 }
 
 function formatCurrency(n) {
-  return '₱' + parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
+  return safeFormatCurrency(n)
 }
 
 function relTime(iso) {

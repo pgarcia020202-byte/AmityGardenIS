@@ -4,6 +4,7 @@ import {
   ClipboardList, BarChart3, LogOut, ChevronRight, Menu, X, Shield, User as UserIcon, Building, Bed, LogIn, DollarSign, Utensils
 } from 'lucide-react'
 import NotificationMenu from '../components/NotificationMenu'
+import { safeFormatDate } from '../utils/formatUtils'
 
 const NAV_ITEMS = [
   { page: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
@@ -184,7 +185,7 @@ export default function Layout({ currentUser, currentPage, onNavigate, onLogout,
               {currentPage === 'users' ? 'User Management' : currentPage === 'staff-expenses' ? 'Staff Expenses' : currentPage === 'hotel-menus' ? 'Hotel Menus' : currentPage.replace('-', ' ')}
             </h1>
             <p className="text-xs text-slate-400 hidden sm:block">
-              {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {safeFormatDate(new Date(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-3">

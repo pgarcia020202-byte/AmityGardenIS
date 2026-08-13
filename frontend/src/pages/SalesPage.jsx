@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, Clock, X, Check, AlertCircle, Eye, Download } from 'lucide-react'
 import jsPDF from 'jspdf'
+import { safeFormatCurrency, safeFormatDateTime } from '../utils/formatUtils'
 
 function formatCurrency(n) {
-  return '₱' + parseFloat(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
+  return safeFormatCurrency(n)
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleString('en-PH', {
+  return safeFormatDateTime(iso, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -534,7 +535,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
 
         // Total (aligned to top of row)
         doc.setFont('helvetica', 'bold')
-        doc.text('PHP ' + (Number(sale.total) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }), xPos, currentY)
+        doc.text('PHP ' + safeFormatCurrency(sale.total).replace('₱', ''), xPos, currentY)
         doc.setFont('helvetica', 'normal')
 
         currentY += dynamicRowHeight
@@ -545,7 +546,7 @@ export default function Sales({ sales, products, categories, currentUser, onAdd,
       const footerY = currentY + 5
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Total Revenue: PHP ${totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`, margin, footerY)
+      doc.text(`Total Revenue: ${safeFormatCurrency(totalRevenue).replace('₱', 'PHP ')}`, margin, footerY)
       doc.text(`Total Records: ${filteredData.length}`, pageWidth - margin, footerY, { align: 'right' })
     }
 

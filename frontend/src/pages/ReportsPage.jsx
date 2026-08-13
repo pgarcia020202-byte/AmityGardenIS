@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { TrendingUp, Package, ShoppingBag, Calendar, Bed, Users, DoorOpen, Clock } from 'lucide-react'
+import { safeFormatCurrency, safeFormatDate } from '../utils/formatUtils'
 
 const COLORS = ['#eab308', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4']
 
@@ -76,7 +77,7 @@ function getRangeEnd(range) {
 }
 
 function formatCurrency(n) {
-  return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return safeFormatCurrency(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function truncateLabel(str, max) {
@@ -226,7 +227,7 @@ export default function Reports({ products, sales, categories, rooms, bookings }
           return saleDate >= monthStart && saleDate <= monthEnd
         })
         
-        const monthName = monthStart.toLocaleDateString('en-PH', { month: 'short' })
+        const monthName = safeFormatDate(monthStart, { month: 'short' })
         
         months.push({
           date: monthName,
@@ -258,7 +259,7 @@ export default function Reports({ products, sales, categories, rooms, bookings }
       })
 
       return {
-        date: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+        date: safeFormatDate(date, { month: 'short', day: 'numeric' }),
         sales: daySales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0),
       }
     })
@@ -344,7 +345,7 @@ export default function Reports({ products, sales, categories, rooms, bookings }
       })
 
       return {
-        date: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
+        date: safeFormatDate(date, { month: 'short', day: 'numeric' }),
         bookings: dayBookings.length,
         revenue: dayBookings.reduce((sum, b) => sum + parseFloat(b.price || 0), 0),
       }

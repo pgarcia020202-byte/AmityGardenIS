@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Search, Pencil, Trash2, Tag, X, Check, AlertCircle } from 'lucide-react'
+import { safeFormatDate } from '../utils/formatUtils'
 
 function Modal({ title, onClose, children }) {
   return (
@@ -127,7 +128,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">{cat.name}</p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {new Date(cat.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {safeFormatDate(cat.created_at, { year: 'numeric', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
               </div>
@@ -189,7 +190,7 @@ export default function Categories({ categories, products, currentUser, onAdd, o
                     <span className="text-sm font-mono text-slate-600">{productCount(cat.id)}</span>
                   </td>
                   <td className="px-5 py-3.5 text-sm text-slate-400">
-                    {new Date(cat.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {safeFormatDate(cat.created_at, { year: 'numeric', month: 'short', day: 'numeric' })}
                   </td>
                   {canManage && (
                     <td className="px-5 py-3.5 text-right">
