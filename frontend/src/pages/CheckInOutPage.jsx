@@ -699,7 +699,8 @@ function BookingDetailsModal({
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Manila'
     })
   }
 
@@ -1912,7 +1913,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: 'Asia/Manila'
     })
   }
 
