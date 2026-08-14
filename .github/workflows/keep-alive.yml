@@ -1,0 +1,23 @@
+name: Keep Render Backend Alive
+
+# Pings the backend every 10 minutes so Render's free tier never spins it
+# down (spin-down happens after 15 min of inactivity). This is a workaround,
+# not a guarantee — GitHub Actions schedules can be delayed under load, so
+# for a production system a paid Render plan remains the reliable fix.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes
+  workflow_dispatch:          # allows manually triggering a run from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        # This endpoint requires auth, so an unauthenticated ping will get a
+        # 401 response — that's expected and fine. The point isn't a
+        # successful response, it's making the server process a request so
+        # Render counts it as active traffic and doesn't spin it down.
+        run: |
+          curl -s -o /dev/null -w "Status: %{http_code}\n" https://amitygardenis.onrender.com/api/auth/verify || true
