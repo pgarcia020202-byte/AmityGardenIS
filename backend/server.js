@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notifications.js';
 import expenseRoutes from './routes/expenses.js';
 import menuCategoryRoutes from './routes/menuCategories.js';
 import menuItemRoutes from './routes/menuItems.js';
+import bootstrapRoutes from './routes/bootstrap.js';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/menu-categories', menuCategoryRoutes);
 app.use('/api/menu-items', menuItemRoutes);
+app.use('/api/bootstrap', bootstrapRoutes);
 
 // Health check
 app.get('/', (req, res) => {

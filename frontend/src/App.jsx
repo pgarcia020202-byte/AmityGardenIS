@@ -14,7 +14,6 @@ import CheckInOutPage from './pages/CheckInOutPage'
 import StaffExpensesPage from './pages/StaffExpensesPage'
 import HotelMenusPage from './pages/HotelMenusPage'
 import {
-  authAPI,
   categoryAPI,
   productAPI,
   salesAPI,
@@ -25,7 +24,8 @@ import {
   notificationsAPI,
   expensesAPI,
   menuCategoriesAPI,
-  menuItemsAPI
+  menuItemsAPI,
+  bootstrapAPI
 } from './services/api'
 
 export default function App() {
@@ -107,109 +107,31 @@ export default function App() {
 
       setLoading(true)
 
-      // Verify token before loading any data
-      try {
-        await authAPI.verifyToken()
-      } catch (error) {
-        console.error('Token verification failed:', error)
-
-        const isAuthFailure = (errorValue) => {
-          const message = errorValue?.message || ''
-          return message.includes('Unauthorized') ||
-            message.includes('Invalid token') ||
-            message.includes('Authentication error') ||
-            message.includes('401') ||
-            message.includes('403')
-        }
-
-        if (isAuthFailure(error)) {
-          handleLogout()
-        }
-
-        setLoading(false)
-        return
-      }
+      // NOTE: We used to call authAPI.verifyToken() here first, as a separate
+      // round trip before loading any data. That's removed — the calls below
+      // already require a valid token and will fail with 401/403 if it's
+      // invalid, which handleRejected() (below) already detects and handles
+      // by logging out. Skipping the separate verify call saves one full
+      // sequential network round trip on every session restore / page load,
+      // which matters most right after a cold start on a slow connection.
 
       try {
-        const results = await Promise.allSettled([
-          categoryAPI.getAll(),
-          productAPI.getAll(),
-          salesAPI.getAll(),
-          stockLogsAPI.getAll(),
-          roomsAPI.getAll(),
-          bookingsAPI.getAll(),
-          expensesAPI.getAll(),
-          menuCategoriesAPI.getAll(),
-          menuItemsAPI.getAll()
-        ])
+        // Single combined request replaces what used to be 9 separate
+        // GET-all requests (categories, products, sales, stock logs, rooms,
+        // bookings, expenses, menu categories, menu items). This cuts
+        // session-restore time significantly, especially right after a
+        // backend cold start, since it's one round trip instead of nine.
+        const data = await bootstrapAPI.getAll()
 
-        const [categoriesResult, productsResult, salesResult, logsResult, roomsResult, bookingsResult, expensesResult, menuCategoriesResult, menuItemsResult] = results
-
-        const handleRejected = (result, name) => {
-          if (!result || result.status !== 'rejected') return
-          const error = result.reason
-          console.error(`Error loading ${name}:`, error)
-          if (error?.message?.includes('Unauthorized') || error?.message?.includes('Invalid token') || error?.message?.includes('Authentication error') || error?.message?.includes('401') || error?.message?.includes('403')) {
-            console.warn('Auth error detected while loading data, clearing session')
-            handleLogout()
-            return true
-          }
-          return false
-        }
-
-        if (categoriesResult.status === 'fulfilled') {
-          setCategories(ensureArray(categoriesResult.value))
-        } else if (handleRejected(categoriesResult, 'categories')) {
-          return
-        }
- 
-        if (productsResult.status === 'fulfilled') {
-          setProducts(ensureArray(productsResult.value))
-        } else if (handleRejected(productsResult, 'products')) {
-          return
-        }
- 
-        if (salesResult.status === 'fulfilled') {
-          setSales(ensureArray(salesResult.value))
-        } else if (handleRejected(salesResult, 'sales')) {
-          return
-        }
- 
-        if (logsResult.status === 'fulfilled') {
-          setStockLogs(ensureArray(logsResult.value))
-        } else if (handleRejected(logsResult, 'stock logs')) {
-          return
-        }
- 
-        if (roomsResult.status === 'fulfilled') {
-          setRooms(ensureArray(roomsResult.value))
-        } else if (handleRejected(roomsResult, 'rooms')) {
-          return
-        }
- 
-        if (bookingsResult.status === 'fulfilled') {
-          setBookings(ensureArray(bookingsResult.value))
-        } else if (handleRejected(bookingsResult, 'bookings')) {
-          return
-        }
- 
-        if (expensesResult.status === 'fulfilled') {
-          setExpenses(ensureArray(expensesResult.value))
-        } else if (handleRejected(expensesResult, 'expenses')) {
-          return
-        }
- 
-        if (menuCategoriesResult.status === 'fulfilled') {
-          setMenuCategories(ensureArray(menuCategoriesResult.value))
-        } else if (handleRejected(menuCategoriesResult, 'menu categories')) {
-          return
-        }
- 
-        if (menuItemsResult.status === 'fulfilled') {
-          setMenuItems(ensureArray(menuItemsResult.value))
-        } else if (handleRejected(menuItemsResult, 'menu items')) {
-          return
-        }
+        setCategories(ensureArray(data?.categories))
+        setProducts(ensureArray(data?.products))
+        setSales(ensureArray(data?.sales))
+        setStockLogs(ensureArray(data?.stockLogs))
+        setRooms(ensureArray(data?.rooms))
+        setBookings(ensureArray(data?.bookings))
+        setExpenses(ensureArray(data?.expenses))
+        setMenuCategories(ensureArray(data?.menuCategories))
+        setMenuItems(ensureArray(data?.menuItems))
 
         if (currentUser?.role === 'admin') {
           try {

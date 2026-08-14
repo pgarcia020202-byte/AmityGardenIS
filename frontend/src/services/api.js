@@ -109,6 +109,16 @@ export const authAPI = {
   }
 }
 
+// Bootstrap API — combined initial-load endpoint.
+// Replaces 9 separate GET-all requests with a single round trip on session
+// restore / page load: { categories, products, sales, stockLogs, rooms,
+// bookings, expenses, menuCategories, menuItems }
+export const bootstrapAPI = {
+  getAll: async () => {
+    return apiCall('/bootstrap')
+  }
+}
+
 // Categories API
 export const categoryAPI = {
   getAll: async () => {
