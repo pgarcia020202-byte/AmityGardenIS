@@ -652,18 +652,24 @@ export default function App() {
       // Some mobile browsers report Notification.permission === 'granted'
       // but still throw "Illegal constructor" on `new Notification(...)`,
       // requiring ServiceWorkerRegistration.showNotification() instead.
+      // Even reading Notification.permission could theoretically throw on
+      // some restrictive embedded webviews, so the whole check is guarded too.
       // This is best-effort/cosmetic, so failures here must never crash the app.
-      if ('Notification' in window && Notification.permission === 'granted') {
-        newWarnings.forEach(warning => {
-          try {
-            new Notification('Time Warning', {
-              body: `${warning.roomNumber} - ${warning.message}`,
-              icon: '/favicon.ico'
-            })
-          } catch (notifError) {
-            console.warn('Browser notification unsupported on this device:', notifError)
-          }
-        })
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          newWarnings.forEach(warning => {
+            try {
+              new Notification('Time Warning', {
+                body: `${warning.roomNumber} - ${warning.message}`,
+                icon: '/favicon.ico'
+              })
+            } catch (notifError) {
+              console.warn('Browser notification unsupported on this device:', notifError)
+            }
+          })
+        }
+      } catch (permError) {
+        console.warn('Notification API unavailable on this device:', permError)
       }
     }
   }

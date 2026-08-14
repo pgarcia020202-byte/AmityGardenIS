@@ -1697,16 +1697,22 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       // Show browser notification if permission granted.
       // Some mobile browsers throw "Illegal constructor" on new Notification()
       // even when permission is 'granted' — must go through a Service Worker
-      // there instead. This is best-effort/cosmetic, so it must never crash the app.
-      if ('Notification' in window && Notification.permission === 'granted') {
-        try {
-          new Notification('Check-in Timer Expired', {
-            body: 'The check-in timer has expired. Please follow up with the guest.',
-            icon: '/favicon.ico'
-          })
-        } catch (notifError) {
-          console.warn('Browser notification unsupported on this device:', notifError)
+      // there instead. Even reading Notification.permission could theoretically
+      // throw on some restrictive embedded webviews, so the whole check is
+      // guarded too. This is best-effort/cosmetic, so it must never crash the app.
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification('Check-in Timer Expired', {
+              body: 'The check-in timer has expired. Please follow up with the guest.',
+              icon: '/favicon.ico'
+            })
+          } catch (notifError) {
+            console.warn('Browser notification unsupported on this device:', notifError)
+          }
         }
+      } catch (permError) {
+        console.warn('Notification API unavailable on this device:', permError)
       }
     }
   }
