@@ -648,13 +648,21 @@ export default function App() {
         }
       }
 
-      // Show browser notification if permission granted
+      // Show browser notification if permission granted.
+      // Some mobile browsers report Notification.permission === 'granted'
+      // but still throw "Illegal constructor" on `new Notification(...)`,
+      // requiring ServiceWorkerRegistration.showNotification() instead.
+      // This is best-effort/cosmetic, so failures here must never crash the app.
       if ('Notification' in window && Notification.permission === 'granted') {
         newWarnings.forEach(warning => {
-          new Notification('Time Warning', {
-            body: `${warning.roomNumber} - ${warning.message}`,
-            icon: '/favicon.ico'
-          })
+          try {
+            new Notification('Time Warning', {
+              body: `${warning.roomNumber} - ${warning.message}`,
+              icon: '/favicon.ico'
+            })
+          } catch (notifError) {
+            console.warn('Browser notification unsupported on this device:', notifError)
+          }
         })
       }
     }
@@ -703,8 +711,14 @@ export default function App() {
 
   // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(err => {
+          console.warn('Notification permission request failed:', err)
+        })
+      }
+    } catch (err) {
+      console.warn('Notifications unsupported on this device:', err)
     }
   }, [])
 

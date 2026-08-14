@@ -699,8 +699,7 @@ function BookingDetailsModal({
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Manila'
+      hour12: true
     })
   }
 
@@ -1695,20 +1694,33 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       // Call parent callback to update notification
       if (onTimerEnd) onTimerEnd(bookingId)
       
-      // Show browser notification if permission granted
+      // Show browser notification if permission granted.
+      // Some mobile browsers throw "Illegal constructor" on new Notification()
+      // even when permission is 'granted' — must go through a Service Worker
+      // there instead. This is best-effort/cosmetic, so it must never crash the app.
       if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('Check-in Timer Expired', {
-          body: 'The check-in timer has expired. Please follow up with the guest.',
-          icon: '/favicon.ico'
-        })
+        try {
+          new Notification('Check-in Timer Expired', {
+            body: 'The check-in timer has expired. Please follow up with the guest.',
+            icon: '/favicon.ico'
+          })
+        } catch (notifError) {
+          console.warn('Browser notification unsupported on this device:', notifError)
+        }
       }
     }
   }
 
   // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(err => {
+          console.warn('Notification permission request failed:', err)
+        })
+      }
+    } catch (err) {
+      console.warn('Notifications unsupported on this device:', err)
     }
   }, [])
 
@@ -1913,8 +1925,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Manila'
+      minute: '2-digit'
     })
   }
 
