@@ -47,7 +47,7 @@ router.post('/', authenticate, async (req, res) => {
 
     await client.query('BEGIN');
 
-    const io = req.app.get('io');
+    const debouncedEmit = req.app.get('debouncedEmit');
 
     // Create expense record
     const expenseResult = await client.query(
@@ -80,7 +80,7 @@ router.post('/', authenticate, async (req, res) => {
       const newStock = updatedProduct.current_stock;
       const prevStock = newStock + item.qty;
 
-      io.emit('product:updated', updatedProduct);
+      debouncedEmit('product:updated', updatedProduct);
 
       // Create stock log - show cumulative negative change
       const stockLogResult = await client.query(
@@ -88,7 +88,7 @@ router.post('/', authenticate, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [item.productId, item.productName, 'Expenses', prevStock, -item.qty, newStock, req.user.id, req.user.name, `Staff Expense #${expense.id}`]
       );
-      io.emit('stockLog:created', stockLogResult.rows[0]);
+      debouncedEmit('stockLog:created', stockLogResult.rows[0]);
 
       // Insert expense item with stock_log_id reference
       await client.query(
@@ -118,7 +118,7 @@ router.post('/', authenticate, async (req, res) => {
       GROUP BY e.id
     `, [expense.id]);
 
-    io.emit('expense:created', completeExpense.rows[0]);
+    debouncedEmit('expense:created', completeExpense.rows[0]);
 
     res.status(201).json(completeExpense.rows[0]);
   } catch (error) {
@@ -148,7 +148,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     await client.query('BEGIN');
 
-    const io = req.app.get('io');
+    const debouncedEmit = req.app.get('debouncedEmit');
 
     // Get existing expense items with stock_log_id
     const existingItemsResult = await client.query(
@@ -189,7 +189,7 @@ router.put('/:id', authenticate, async (req, res) => {
           const newStock = updatedProduct.current_stock;
           const prevStock = newStock - qtyDiff;
 
-          io.emit('product:updated', updatedProduct);
+          debouncedEmit('product:updated', updatedProduct);
 
           // Update existing stock log if it exists, otherwise create new one
           if (originalItem.stock_log_id) {
@@ -205,7 +205,7 @@ router.put('/:id', authenticate, async (req, res) => {
               'SELECT id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at FROM stock_logs WHERE id = $1',
               [originalItem.stock_log_id]
             );
-            io.emit('stockLog:created', updatedLogResult.rows[0]);
+            debouncedEmit('stockLog:created', updatedLogResult.rows[0]);
           } else {
             // Fallback: create new stock log for historical data without stock_log_id
             const originalPrevStock = newStock + newItem.qty;
@@ -214,7 +214,7 @@ router.put('/:id', authenticate, async (req, res) => {
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
               [newItem.productId, newItem.productName, 'Expenses', originalPrevStock, -newItem.qty, newStock, req.user.id, req.user.name, `Expense edit #${id}`]
             );
-            io.emit('stockLog:created', stockLogResult.rows[0]);
+            debouncedEmit('stockLog:created', stockLogResult.rows[0]);
             
             await client.query(
               `UPDATE expense_items SET stock_log_id = $1 WHERE id = $2`,
@@ -257,14 +257,14 @@ router.put('/:id', authenticate, async (req, res) => {
         const newStock = updatedProduct.current_stock;
         const prevStock = newStock + newItem.qty;
 
-        io.emit('product:updated', updatedProduct);
+        debouncedEmit('product:updated', updatedProduct);
 
         const stockLogResult = await client.query(
           `INSERT INTO stock_logs (product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
           [newItem.productId, newItem.productName, 'Expenses', prevStock, -newItem.qty, newStock, req.user.id, req.user.name, `Expense edit #${id}`]
         );
-        io.emit('stockLog:created', stockLogResult.rows[0]);
+        debouncedEmit('stockLog:created', stockLogResult.rows[0]);
 
         await client.query(
           `UPDATE expense_items SET stock_log_id = $1 WHERE expense_id = $2 AND product_id = $3`,
@@ -290,12 +290,12 @@ router.put('/:id', authenticate, async (req, res) => {
         [productId]
       );
       const updatedProduct = productResult.rows[0];
-      io.emit('product:updated', updatedProduct);
+      debouncedEmit('product:updated', updatedProduct);
 
       // Delete the associated stock log if it exists
       if (originalItem.stock_log_id) {
         await client.query('DELETE FROM stock_logs WHERE id = $1', [originalItem.stock_log_id]);
-        io.emit('stockLog:deleted', originalItem.stock_log_id);
+        debouncedEmit('stockLog:deleted', originalItem.stock_log_id);
       }
 
       // Delete expense item
@@ -332,7 +332,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
-    io.emit('expense:updated', completeExpense.rows[0]);
+    debouncedEmit('expense:updated', completeExpense.rows[0]);
 
     res.json(completeExpense.rows[0]);
   } catch (error) {
@@ -353,7 +353,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     await client.query('BEGIN');
 
-    const io = req.app.get('io');
+    const debouncedEmit = req.app.get('debouncedEmit');
 
     // Get expense items to restore stock and delete associated stock logs
     const itemsResult = await client.query(
@@ -366,7 +366,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       // Delete the associated stock log if it exists (do this first, before product checks)
       if (item.stock_log_id) {
         await client.query('DELETE FROM stock_logs WHERE id = $1', [item.stock_log_id]);
-        io.emit('stockLog:deleted', item.stock_log_id);
+        debouncedEmit('stockLog:deleted', item.stock_log_id);
       }
 
       // Skip if product_id is NULL (product was deleted)
@@ -400,7 +400,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       const newStock = updatedProduct.current_stock;
       const prevStock = newStock - item.qty;
 
-      io.emit('product:updated', updatedProduct);
+      debouncedEmit('product:updated', updatedProduct);
     }
 
     // Delete expense (cascade will delete expense_items)
@@ -408,7 +408,7 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     await client.query('COMMIT');
 
-    io.emit('expense:deleted', id);
+    debouncedEmit('expense:deleted', id);
 
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {

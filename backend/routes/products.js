@@ -74,15 +74,15 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
         [product.id, product.name, 'Stock In', 0, stock, stock, req.user.id, req.user.name, 'Initial stock']
       );
       const stockLog = stockLogResult.rows[0];
-      const io = req.app.get('io');
-      io.emit('stockLog:created', stockLog);
+      const debouncedEmit = req.app.get('debouncedEmit');
+      debouncedEmit('stockLog:created', stockLog);
     }
 
     await client.query('COMMIT');
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('product:created', product);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('product:created', product);
 
     res.status(201).json(product);
   } catch (error) {
@@ -161,15 +161,15 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
         [updatedProduct.id, updatedProduct.name, logType, oldStock, qtyChanged, newStock, req.user.id, req.user.name, 'Stock adjustment']
       );
       const stockLog = stockLogResult.rows[0];
-      const io = req.app.get('io');
-      io.emit('stockLog:created', stockLog);
+      const debouncedEmit = req.app.get('debouncedEmit');
+      debouncedEmit('stockLog:created', stockLog);
     }
 
     await client.query('COMMIT');
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('product:updated', updatedProduct);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('product:updated', updatedProduct);
 
     res.json(updatedProduct);
   } catch (error) {
@@ -202,8 +202,8 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     await pool.query('DELETE FROM products WHERE id = $1', [id]);
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('product:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('product:deleted', id);
 
     res.status(204).send();
   } catch (error) {

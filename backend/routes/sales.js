@@ -78,8 +78,8 @@ router.post('/', authenticate, async (req, res) => {
       const newStock = updatedProduct.current_stock;
       const prevStock = newStock + item.qty;
 
-      const io = req.app.get('io');
-      io.emit('product:updated', updatedProduct);
+      const debouncedEmit = req.app.get('debouncedEmit');
+      debouncedEmit('product:updated', updatedProduct);
 
       // Create stock log - show cumulative negative change
       const stockLogResult = await client.query(
@@ -87,7 +87,7 @@ router.post('/', authenticate, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
         [item.productId, item.productName, 'Sale', prevStock, -item.qty, newStock, req.user.id, req.user.name, `Sale #${sale.id}`]
       );
-      io.emit('stockLog:created', stockLogResult.rows[0]);
+      debouncedEmit('stockLog:created', stockLogResult.rows[0]);
 
       // Insert sale item with stock_log_id reference
       await client.query(
@@ -120,8 +120,8 @@ router.post('/', authenticate, async (req, res) => {
     const newSale = completeResult.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('sale:created', newSale);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('sale:created', newSale);
 
     res.status(201).json(newSale);
   } catch (error) {
@@ -197,8 +197,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
           const newStock = updatedProduct.current_stock;
           const prevStock = newStock - qtyDiff;
 
-          const io = req.app.get('io');
-          io.emit('product:updated', updatedProduct);
+          const debouncedEmit = req.app.get('debouncedEmit');
+          debouncedEmit('product:updated', updatedProduct);
 
           // Update existing stock log if it exists, otherwise create new one
           if (originalItem.stock_log_id) {
@@ -216,7 +216,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
               'SELECT id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at FROM stock_logs WHERE id = $1',
               [originalItem.stock_log_id]
             );
-            io.emit('stockLog:created', updatedLogResult.rows[0]);
+            debouncedEmit('stockLog:created', updatedLogResult.rows[0]);
           } else {
             // Fallback: create new stock log for historical data without stock_log_id
             const originalPrevStock = newStock + newItem.qty;
@@ -225,7 +225,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
               [newItem.productId, newItem.productName, 'Sale', originalPrevStock, -newItem.qty, newStock, req.user.id, req.user.name, `Sale edit #${id}`]
             );
-            io.emit('stockLog:created', stockLogResult.rows[0]);
+            debouncedEmit('stockLog:created', stockLogResult.rows[0]);
             
             // Update sale item with new stock_log_id
             await client.query(
@@ -272,8 +272,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
         const newStock = updatedProduct.current_stock;
         const prevStock = newStock + newItem.qty;
 
-        const io = req.app.get('io');
-        io.emit('product:updated', updatedProduct);
+        const debouncedEmit = req.app.get('debouncedEmit');
+        debouncedEmit('product:updated', updatedProduct);
 
         // Create stock log - show cumulative negative change
         const stockLogResult = await client.query(
@@ -281,7 +281,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, date, product_id, product_name, type, prev_stock, qty_changed, new_stock, user_id, user_name, remarks, created_at`,
           [newItem.productId, newItem.productName, 'Sale', prevStock, -newItem.qty, newStock, req.user.id, req.user.name, `Sale edit #${id}`]
         );
-        io.emit('stockLog:created', stockLogResult.rows[0]);
+        debouncedEmit('stockLog:created', stockLogResult.rows[0]);
       }
     }
 
@@ -314,8 +314,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
         const newStock = updatedProduct.current_stock;
         const prevStock = newStock - originalItem.qty;
 
-        const io = req.app.get('io');
-        io.emit('product:updated', updatedProduct);
+        const debouncedEmit = req.app.get('debouncedEmit');
+        debouncedEmit('product:updated', updatedProduct);
 
         // Delete the original stock log if it exists
         if (originalItem.stock_log_id) {
@@ -353,8 +353,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     const updatedSale = completeResult.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('sale:updated', updatedSale);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('sale:updated', updatedSale);
 
     res.json(updatedSale);
   } catch (error) {
@@ -419,8 +419,8 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
       const newStock = updatedProduct.current_stock;
       const prevStock = newStock - item.qty;
 
-      const io = req.app.get('io');
-      io.emit('product:updated', updatedProduct);
+      const debouncedEmit = req.app.get('debouncedEmit');
+      debouncedEmit('product:updated', updatedProduct);
     }
 
     // Delete sale (cascade will delete sale items)
@@ -429,8 +429,8 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     await client.query('COMMIT');
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('sale:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('sale:deleted', id);
 
     res.status(204).send();
   } catch (error) {

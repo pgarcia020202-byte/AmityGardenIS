@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { Plus, Search, Pencil, Trash2, Utensils, AlertCircle, X, Check, Layers } from 'lucide-react'
 
+function getMenuItemStatus(item) {
+  if (item.stock === 0) return 'Out of Stock'
+  if (item.stock <= (item.min_stock || 0)) return 'Low Stock'
+  return 'In Stock'
+}
+
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -22,6 +28,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
   const [activeTab, setActiveTab] = useState('items')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name')
   
   // Category form state
@@ -39,6 +46,8 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
   const [itemFormName, setItemFormName] = useState('')
   const [itemFormCategory, setItemFormCategory] = useState('')
   const [itemFormPrice, setItemFormPrice] = useState('')
+  const [itemFormStock, setItemFormStock] = useState('')
+  const [itemFormMinStock, setItemFormMinStock] = useState('')
   const [itemError, setItemError] = useState('')
   const [itemLoading, setItemLoading] = useState(false)
 
@@ -50,7 +59,9 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
   const filteredItems = safeMenuItems.filter(item => {
     const matchesSearch = String(item?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter === 'all' || String(item.category_id) === String(categoryFilter)
-    return matchesSearch && matchesCategory
+    const status = getMenuItemStatus(item)
+    const matchesStatus = statusFilter === 'all' || status === statusFilter
+    return matchesSearch && matchesCategory && matchesStatus
   }).sort((a, b) => {
     switch(sortBy) {
       case 'name':
@@ -159,17 +170,30 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
     if (itemLoading) return
     const name = itemFormName.trim()
     const price = parseFloat(itemFormPrice)
+    const stock = parseInt(itemFormStock)
+    const minStock = parseInt(itemFormMinStock)
 
     if (!name) { setItemError('Item name is required.'); return }
     if (!itemFormCategory) { setItemError('Category is required.'); return }
     if (isNaN(price) || price < 0) { setItemError('Valid price is required.'); return }
+    if (isNaN(stock) || stock < 0) { setItemError('Valid stock quantity is required.'); return }
+    if (isNaN(minStock) || minStock < 0) { setItemError('Valid minimum stock is required.'); return }
+
+    const existingItem = safeMenuItems.find(item => String(item?.name ?? '').toLowerCase() === name.toLowerCase())
+    if (existingItem) {
+      setItemError('A menu item with this name already exists.')
+      return
+    }
 
     setItemLoading(true)
     try {
       await onAddItem({
         category_id: parseInt(itemFormCategory),
         name,
-        price
+        price,
+        stock,
+        min_stock: minStock,
+        sold: 0
       })
       resetItemFormSimple()
       setAddItemOpen(false)
@@ -185,17 +209,33 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
     if (itemLoading) return
     const name = itemFormName.trim()
     const price = parseFloat(itemFormPrice)
+    const stock = parseInt(itemFormStock)
+    const minStock = parseInt(itemFormMinStock)
 
     if (!name) { setItemError('Item name is required.'); return }
     if (!itemFormCategory) { setItemError('Category is required.'); return }
     if (isNaN(price) || price < 0) { setItemError('Valid price is required.'); return }
+    if (isNaN(stock) || stock < 0) { setItemError('Valid stock quantity is required.'); return }
+    if (isNaN(minStock) || minStock < 0) { setItemError('Valid minimum stock is required.'); return }
+
+    const existingItem = safeMenuItems.find(item => 
+      String(item?.name ?? '').toLowerCase() === name.toLowerCase() && 
+      item.id !== editItemTarget.id
+    )
+    if (existingItem) {
+      setItemError('A menu item with this name already exists.')
+      return
+    }
 
     setItemLoading(true)
     try {
       await onEditItem(editItemTarget.id, {
         category_id: parseInt(itemFormCategory),
         name,
-        price
+        price,
+        stock,
+        min_stock: minStock,
+        sold: editItemTarget.sold || 0
       })
       resetItemFormSimple()
       setEditItemTarget(null)
@@ -223,6 +263,8 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
     setItemFormName('')
     setItemFormCategory('')
     setItemFormPrice('')
+    setItemFormStock('')
+    setItemFormMinStock('')
     setItemError('')
   }
 
@@ -231,6 +273,8 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
     setItemFormName(item.name)
     setItemFormCategory(item.category_id?.toString() || '')
     setItemFormPrice(item.price?.toString() || '')
+    setItemFormStock(item.stock?.toString() || '')
+    setItemFormMinStock(item.min_stock?.toString() || '')
     setItemError('')
   }
 
@@ -290,7 +334,7 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
+                <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap">
                   <select
                     value={categoryFilter}
                     onChange={e => setCategoryFilter(e.target.value)}
@@ -300,6 +344,16 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     {safeMenuCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="In Stock">In Stock</option>
+                    <option value="Low Stock">Low Stock</option>
+                    <option value="Out of Stock">Out of Stock</option>
                   </select>
                   <select
                     value={sortBy}
@@ -319,10 +373,11 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
           <div className="sm:hidden space-y-2.5">
             {filteredItems.length === 0 && (
               <div className="bg-white rounded-xl border border-slate-200 px-5 py-12 text-center text-sm text-slate-400">
-                {search ? 'No items match your search.' : 'No menu items yet.'}
+                {search || categoryFilter !== 'all' || statusFilter !== 'all' ? 'No items match your filters.' : 'No menu items yet.'}
               </div>
             )}
             {filteredItems.map(item => {
+              const status = getMenuItemStatus(item)
               const category = safeMenuCategories.find(c => c.id === item.category_id)
               return (
                 <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-4">
@@ -338,15 +393,33 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                         )}
                       </div>
                     </div>
-                    <span className="text-xs font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded shrink-0">
-                      ₱{parseFloat(item.price).toFixed(2)}
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${
+                      status === 'In Stock' ? 'bg-green-100 text-green-700' :
+                      status === 'Low Stock' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-rose-100 text-rose-700'
+                    }`}>
+                      {status}
                     </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100">
+                    <div>
+                      <p className="text-xs text-slate-400">Price</p>
+                      <p className="text-sm font-mono text-slate-900 mt-0.5">₱{parseFloat(item.price).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Stock</p>
+                      <p className="text-sm font-mono text-slate-600 mt-0.5">{item.stock ?? 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Sold</p>
+                      <p className="text-sm font-mono text-slate-600 mt-0.5">{item.sold ?? 0}</p>
+                    </div>
                   </div>
                   {canEdit && (
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
                       <button
                         onClick={() => openEditItem(item)}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all duration-200 border border-slate-200"
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-slate-200"
                       >
                         <Pencil size={13} /> Edit
                       </button>
@@ -372,18 +445,22 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                     <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Item Name</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Price</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Stock</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Sold</th>
                     {canEdit && <th className="px-5 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-5 py-12 text-center text-sm text-slate-400">
-                        {search ? 'No items match your search.' : 'No menu items yet.'}
+                      <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
+                        {search || categoryFilter !== 'all' || statusFilter !== 'all' ? 'No items match your filters.' : 'No menu items yet.'}
                       </td>
                     </tr>
                   )}
                   {filteredItems.map((item) => {
+                    const status = getMenuItemStatus(item)
                     const category = safeMenuCategories.find(c => c.id === item.category_id)
                     return (
                       <tr key={item.id} className="hover:bg-slate-50 transition-colors">
@@ -401,22 +478,39 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                         <td className="px-5 py-3.5">
                           <span className="text-sm font-medium text-slate-700">₱{parseFloat(item.price).toFixed(2)}</span>
                         </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-sm font-mono text-slate-600">{item.stock ?? 0}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                            status === 'In Stock' ? 'bg-green-100 text-green-700' :
+                            status === 'Low Stock' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-rose-100 text-rose-700'
+                          }`}>
+                            {status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-sm font-mono text-slate-600">{item.sold ?? 0}</span>
+                        </td>
                         {canEdit && (
                           <td className="px-5 py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => openEditItem(item)}
-                                className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title="Edit item"
+                                className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all duration-200 border border-transparent hover:border-sky-200"
+                                title="Edit"
                               >
-                                <Pencil size={14} />
+                                <Pencil size={13} className="group-hover:scale-110 transition-transform" />
+                                <span className="hidden lg:inline">Edit</span>
                               </button>
                               <button
                                 onClick={() => setDeleteItemTarget(item)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Delete item"
+                                className="group flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200 border border-transparent hover:border-rose-200"
+                                title="Delete"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={13} className="group-hover:scale-110 transition-transform" />
+                                <span className="hidden lg:inline">Delete</span>
                               </button>
                             </div>
                           </td>
@@ -714,17 +808,44 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                 ))}
               </select>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Price (₱)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={itemFormPrice}
+                  onChange={(e) => { setItemFormPrice(e.target.value); setItemError('') }}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Current Stock</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={itemFormStock}
+                  onChange={(e) => { setItemFormStock(e.target.value); setItemError('') }}
+                  placeholder="0"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+              </div>
+            </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Price (₱)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Minimum Stock Alert</label>
               <input
                 type="number"
-                step="0.01"
-                value={itemFormPrice}
-                onChange={(e) => { setItemFormPrice(e.target.value); setItemError('') }}
-                placeholder="0.00"
+                step="1"
+                value={itemFormMinStock}
+                onChange={(e) => { setItemFormMinStock(e.target.value); setItemError('') }}
+                placeholder="10"
                 className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
               />
             </div>
+            {itemError && (
+              <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{itemError}</p>
+            )}
             <div className="flex gap-3 pt-1">
               <button
                 type="button"
@@ -776,17 +897,44 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
                 ))}
               </select>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Price (₱) *</label>
+                <input
+                  type="number"
+                  value={itemFormPrice}
+                  onChange={(e) => setItemFormPrice(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Current Stock</label>
+                <input
+                  type="number"
+                  value={itemFormStock}
+                  onChange={(e) => setItemFormStock(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  step="1"
+                  min="0"
+                />
+              </div>
+            </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Price (₱) *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Minimum Stock Alert</label>
               <input
                 type="number"
-                value={itemFormPrice}
-                onChange={(e) => setItemFormPrice(e.target.value)}
+                value={itemFormMinStock}
+                onChange={(e) => setItemFormMinStock(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                step="0.01"
+                step="1"
                 min="0"
               />
             </div>
+            {itemError && (
+              <p className="text-xs text-rose-600 flex items-center gap-1"><AlertCircle size={12} />{itemError}</p>
+            )}
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -798,9 +946,9 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
               <button
                 type="submit"
                 disabled={itemLoading}
-                className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg text-sm font-medium hover:bg-yellow-600 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-sky-500/25 rounded-lg text-sm text-white font-medium flex items-center justify-center gap-2 transition-all duration-200"
               >
-                {itemLoading ? 'Updating...' : 'Update Item'}
+                <Check size={15} /> {itemLoading ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </form>
@@ -811,28 +959,42 @@ export default function HotelMenus({ menuCategories, menuItems, currentUser, onA
       {deleteItemTarget && (
         <Modal title="Delete Menu Item" onClose={() => setDeleteItemTarget(null)}>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg">
-              <AlertCircle size={20} className="shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium">Are you sure you want to delete "{deleteItemTarget.name}"?</p>
-                <p className="mt-1">This action cannot be undone.</p>
-              </div>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setDeleteItemTarget(null)}
-                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteItem}
-                disabled={itemLoading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                {itemLoading ? 'Deleting...' : 'Delete Item'}
-              </button>
-            </div>
+            {deleteItemTarget.stock > 0 ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Cannot delete <span className="font-semibold text-slate-900">"{deleteItemTarget.name}"</span> because it has {deleteItemTarget.stock} remaining stock.
+                </p>
+                <p className="text-sm text-rose-600">
+                  Please reduce the stock to 0 before deleting this menu item.
+                </p>
+                <button onClick={() => setDeleteItemTarget(null)} className="w-full py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">Close</button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg">
+                  <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Are you sure you want to delete "{deleteItemTarget.name}"?</p>
+                    <p className="mt-1">This action cannot be undone.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setDeleteItemTarget(null)}
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteItem}
+                    disabled={itemLoading}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {itemLoading ? 'Deleting...' : 'Delete Item'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

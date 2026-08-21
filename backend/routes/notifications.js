@@ -6,9 +6,9 @@ const router = express.Router();
 
 // Helper function to emit socket events
 const emitNotificationEvent = (req, event, data) => {
-  const io = req.app.get('io');
-  if (io) {
-    io.emit(event, data);
+  const debouncedEmit = req.app.get('debouncedEmit');
+  if (debouncedEmit) {
+    debouncedEmit(event, data);
   }
 };
 

@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 8000;
 // Create HTTP server
 const httpServer = createServer(app);
 
-// Create Socket.IO server
+// Create Socket.IO server with debouncing
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'],
@@ -33,8 +33,32 @@ const io = new Server(httpServer, {
   }
 });
 
+// Debounce socket events to prevent flooding
+const eventQueue = new Map();
+const pendingEvents = new Map();
+
+const debouncedEmit = (event, data) => {
+  const eventKey = `${event}-${JSON.stringify(data)}`;
+  
+  // If this exact event is already pending, skip it
+  if (pendingEvents.has(eventKey)) {
+    return;
+  }
+  
+  pendingEvents.set(eventKey, true);
+  
+  // Clear the pending flag after a short delay
+  setTimeout(() => {
+    pendingEvents.delete(eventKey);
+  }, 100);
+  
+  // Emit the event
+  io.emit(event, data);
+};
+
 // Make io accessible to routes
 app.set('io', io);
+app.set('debouncedEmit', debouncedEmit);
 
 // Middleware
 app.use(cors());

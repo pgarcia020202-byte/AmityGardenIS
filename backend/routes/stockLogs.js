@@ -63,8 +63,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     );
 
     const newLog = result.rows[0];
-    const io = req.app.get('io');
-    io.emit('stockLog:created', newLog);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('stockLog:created', newLog);
 
     res.status(201).json(newLog);
   } catch (error) {
@@ -87,8 +87,8 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Stock log not found' });
     }
 
-    const io = req.app.get('io');
-    io.emit('stockLog:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('stockLog:deleted', id);
 
     res.status(204).send();
   } catch (error) {

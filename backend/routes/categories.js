@@ -46,8 +46,8 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
     const newCategory = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('category:created', newCategory);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('category:created', newCategory);
 
     res.status(201).json(newCategory);
   } catch (error) {
@@ -92,8 +92,8 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     const updatedCategory = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('category:updated', updatedCategory);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('category:updated', updatedCategory);
 
     res.json(updatedCategory);
   } catch (error) {
@@ -123,8 +123,8 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     await pool.query('DELETE FROM categories WHERE id = $1', [id]);
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('category:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('category:deleted', id);
 
     res.status(204).send();
   } catch (error) {

@@ -56,8 +56,8 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
     const newRoom = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('room:created', newRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('room:created', newRoom);
 
     res.status(201).json(newRoom);
   } catch (error) {
@@ -104,8 +104,8 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     const updatedRoom = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('room:updated', updatedRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('room:updated', updatedRoom);
 
     res.json(updatedRoom);
   } catch (error) {
@@ -129,8 +129,8 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     await pool.query('DELETE FROM rooms WHERE id = $1', [id]);
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('room:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('room:deleted', id);
 
     res.status(204).send();
   } catch (error) {

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Bell, X, Clock, Bed } from 'lucide-react'
 
-export default function NotificationMenu({ notifications, onDismiss, onDismissAll, onNotificationClick }) {
+export default memo(function NotificationMenu({ notifications, onDismiss, onDismissAll, onNotificationClick }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const unreadCount = notifications.filter(n => !n.read).length
@@ -90,4 +90,4 @@ export default function NotificationMenu({ notifications, onDismiss, onDismissAl
       )}
     </div>
   )
-}
+})

@@ -126,10 +126,10 @@ router.get('/', authenticate, async (req, res) => {
 
       // menuItems.js
       pool.query(`
-        SELECT mi.*, 
+        SELECT mi.*,
                mc.name as category_name
-        FROM menu_items mi 
-        LEFT JOIN menu_categories mc ON mi.category_id = mc.id 
+        FROM menu_items mi
+        LEFT JOIN menu_categories mc ON mi.category_id = mc.id
         ORDER BY mc.name ASC, mi.name ASC
       `)
     ]);

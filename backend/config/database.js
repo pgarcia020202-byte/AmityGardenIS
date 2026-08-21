@@ -18,9 +18,13 @@ const pool = new Pool({
   family: 4, // Force IPv4 instead of IPv6
 });
 
-// Test connection
+// Test connection - only log once on successful connection
+let connectionLogged = false;
 pool.on('connect', () => {
-  console.log('Connected to Supabase PostgreSQL database');
+  if (!connectionLogged) {
+    console.log('Connected to Supabase PostgreSQL database');
+    connectionLogged = true;
+  }
 });
 
 pool.on('error', (err) => {

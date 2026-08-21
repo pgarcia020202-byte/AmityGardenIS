@@ -8,10 +8,10 @@ const router = express.Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT mi.*, 
+      SELECT mi.*,
              mc.name as category_name
-      FROM menu_items mi 
-      LEFT JOIN menu_categories mc ON mi.category_id = mc.id 
+      FROM menu_items mi
+      LEFT JOIN menu_categories mc ON mi.category_id = mc.id
       ORDER BY mc.name ASC, mi.name ASC
     `);
     res.json(result.rows);
@@ -26,10 +26,10 @@ router.get('/category/:categoryId', authenticate, async (req, res) => {
   try {
     const { categoryId } = req.params;
     const result = await pool.query(`
-      SELECT mi.*, 
+      SELECT mi.*,
              mc.name as category_name
-      FROM menu_items mi 
-      LEFT JOIN menu_categories mc ON mi.category_id = mc.id 
+      FROM menu_items mi
+      LEFT JOIN menu_categories mc ON mi.category_id = mc.id
       WHERE mi.category_id = $1
       ORDER BY mi.name ASC
     `, [categoryId]);
@@ -45,10 +45,10 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
-      SELECT mi.*, 
+      SELECT mi.*,
              mc.name as category_name
-      FROM menu_items mi 
-      LEFT JOIN menu_categories mc ON mi.category_id = mc.id 
+      FROM menu_items mi
+      LEFT JOIN menu_categories mc ON mi.category_id = mc.id
       WHERE mi.id = $1
     `, [id]);
     if (result.rows.length === 0) {
@@ -64,7 +64,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create menu item (admin or staff)
 router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
-    const { category_id, name, price } = req.body;
+    const { category_id, name, price, stock, min_stock, sold } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Menu item name is required' });
@@ -78,6 +78,14 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
       return res.status(400).json({ error: 'Valid price is required' });
     }
 
+    if (stock !== undefined && (isNaN(stock) || stock < 0)) {
+      return res.status(400).json({ error: 'Valid stock quantity is required' });
+    }
+
+    if (min_stock !== undefined && (isNaN(min_stock) || min_stock < 0)) {
+      return res.status(400).json({ error: 'Valid minimum stock is required' });
+    }
+
     // Check if category exists
     const categoryCheck = await pool.query('SELECT id FROM menu_categories WHERE id = $1', [category_id]);
     if (categoryCheck.rows.length === 0) {
@@ -86,18 +94,32 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
 
     const trimmedName = name.trim();
 
+    // Check if menu item name already exists
+    const existing = await pool.query(
+      'SELECT id FROM menu_items WHERE LOWER(name) = LOWER($1)',
+      [trimmedName]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Menu item with this name already exists' });
+    }
+
+    const stockValue = stock !== undefined ? stock : 0;
+    const minStockValue = min_stock !== undefined ? min_stock : 0;
+    const soldValue = sold !== undefined ? sold : 0;
+
     const result = await pool.query(
-      `INSERT INTO menu_items (category_id, name, price) 
-       VALUES ($1, $2, $3) 
-       RETURNING id, category_id, name, price, created_at, updated_at`,
-      [category_id, trimmedName, price]
+      `INSERT INTO menu_items (category_id, name, price, stock, min_stock, sold)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, category_id, name, price, stock, min_stock, sold, created_at, updated_at`,
+      [category_id, trimmedName, price, stockValue, minStockValue, soldValue]
     );
 
     const menuItem = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('menuItem:created', menuItem);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('menuItem:created', menuItem);
 
     res.status(201).json(menuItem);
   } catch (error) {
@@ -110,7 +132,7 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
 router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
-    const { category_id, name, price } = req.body;
+    const { category_id, name, price, stock, min_stock, sold } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Menu item name is required' });
@@ -122,6 +144,14 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
 
     if (!price || price < 0) {
       return res.status(400).json({ error: 'Valid price is required' });
+    }
+
+    if (stock !== undefined && (isNaN(stock) || stock < 0)) {
+      return res.status(400).json({ error: 'Valid stock quantity is required' });
+    }
+
+    if (min_stock !== undefined && (isNaN(min_stock) || min_stock < 0)) {
+      return res.status(400).json({ error: 'Valid minimum stock is required' });
     }
 
     // Check if menu item exists
@@ -138,22 +168,39 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
 
     const trimmedName = name.trim();
 
+    // Check if name exists for another menu item
+    const nameCheck = await pool.query(
+      'SELECT id FROM menu_items WHERE LOWER(name) = LOWER($1) AND id != $2',
+      [trimmedName, id]
+    );
+
+    if (nameCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Menu item name already exists' });
+    }
+
+    const stockValue = stock !== undefined ? stock : 0;
+    const minStockValue = min_stock !== undefined ? min_stock : 0;
+    const soldValue = sold !== undefined ? sold : 0;
+
     const result = await pool.query(
-      `UPDATE menu_items 
-       SET category_id = $1, 
-           name = $2, 
+      `UPDATE menu_items
+       SET category_id = $1,
+           name = $2,
            price = $3,
-           updated_at = CURRENT_TIMESTAMP 
-       WHERE id = $4 
-       RETURNING id, category_id, name, price, created_at, updated_at`,
-      [category_id, trimmedName, price, id]
+           stock = $4,
+           min_stock = $5,
+           sold = $6,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7
+       RETURNING id, category_id, name, price, stock, min_stock, sold, created_at, updated_at`,
+      [category_id, trimmedName, price, stockValue, minStockValue, soldValue, id]
     );
 
     const updatedMenuItem = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('menuItem:updated', updatedMenuItem);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('menuItem:updated', updatedMenuItem);
 
     res.json(updatedMenuItem);
   } catch (error) {
@@ -168,16 +215,23 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     const { id } = req.params;
 
     // Check if menu item exists
-    const existing = await pool.query('SELECT id, name FROM menu_items WHERE id = $1', [id]);
+    const existing = await pool.query('SELECT id, name, stock FROM menu_items WHERE id = $1', [id]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Menu item not found' });
+    }
+
+    const menuItem = existing.rows[0];
+
+    // Check if menu item has remaining stock
+    if (menuItem.stock > 0) {
+      return res.status(400).json({ error: `Cannot delete menu item "${menuItem.name}" with ${menuItem.stock} remaining stock. Please reduce stock to 0 first.` });
     }
 
     await pool.query('DELETE FROM menu_items WHERE id = $1', [id]);
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('menuItem:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('menuItem:deleted', id);
 
     res.status(204).send();
   } catch (error) {

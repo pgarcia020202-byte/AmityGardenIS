@@ -4,6 +4,92 @@ import { authenticate, requireAdminOrStaff } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Helper function to process menu item stock and sales
+async function processMenuItemStockAndSales(items, req) {
+  if (!items || !Array.isArray(items) || items.length === 0) return;
+
+  for (const item of items) {
+    if (!item.id || !item.quantity || item.quantity <= 0) continue;
+
+    try {
+      // Get current menu item data
+      const menuItem = await pool.query(
+        'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+        [item.id]
+      );
+
+      if (menuItem.rows.length === 0) continue;
+
+      const currentStock = menuItem.rows[0].stock || 0;
+      const currentSold = menuItem.rows[0].sold || 0;
+      const quantity = parseInt(item.quantity);
+
+      // Deduct stock and increment sales
+      const newStock = Math.max(0, currentStock - quantity);
+      const newSold = currentSold + quantity;
+
+      await pool.query(
+        'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+        [newStock, newSold, item.id]
+      );
+
+      // Emit socket event for real-time update
+      const debouncedEmit = req.app.get('debouncedEmit');
+      const updatedMenuItem = {
+        id: item.id,
+        stock: newStock,
+        sold: newSold
+      };
+      debouncedEmit('menuItem:updated', updatedMenuItem);
+    } catch (error) {
+      console.error(`Error processing menu item ${item.id}:`, error);
+    }
+  }
+}
+
+// Helper function to revert menu item stock and sales (for removals)
+async function revertMenuItemStockAndSales(items, req) {
+  if (!items || !Array.isArray(items) || items.length === 0) return;
+
+  for (const item of items) {
+    if (!item.id || !item.quantity || item.quantity <= 0) continue;
+
+    try {
+      // Get current menu item data
+      const menuItem = await pool.query(
+        'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+        [item.id]
+      );
+
+      if (menuItem.rows.length === 0) continue;
+
+      const currentStock = menuItem.rows[0].stock || 0;
+      const currentSold = menuItem.rows[0].sold || 0;
+      const quantity = parseInt(item.quantity);
+
+      // Add back stock and decrement sales
+      const newStock = currentStock + quantity;
+      const newSold = Math.max(0, currentSold - quantity);
+
+      await pool.query(
+        'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+        [newStock, newSold, item.id]
+      );
+
+      // Emit socket event for real-time update
+      const debouncedEmit = req.app.get('debouncedEmit');
+      const updatedMenuItem = {
+        id: item.id,
+        stock: newStock,
+        sold: newSold
+      };
+      debouncedEmit('menuItem:updated', updatedMenuItem);
+    } catch (error) {
+      console.error(`Error reverting menu item ${item.id}:`, error);
+    }
+  }
+}
+
 // Get all bookings
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -162,6 +248,72 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
 
     const newBooking = result.rows[0];
 
+    // If the fallback was used, fetch the booking again to get all fields
+    if (!newBooking.order_items && !newBooking.addons_items) {
+      const freshBooking = await pool.query(
+        'SELECT id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items, created_at, updated_at FROM bookings WHERE id = $1',
+        [newBooking.id]
+      );
+      Object.assign(newBooking, freshBooking.rows[0]);
+    }
+
+    // Process menu item stock and sales for order items
+    if (order_items && Array.isArray(order_items)) {
+      await processMenuItemStockAndSales(order_items, req);
+    }
+
+    // Process menu item stock and sales for add-ons
+    if (addons_items && Array.isArray(addons_items)) {
+      await processMenuItemStockAndSales(addons_items, req);
+    }
+
+    // Process complimentary items (deduct stock and increment sales count)
+    if (complimentary_item_1) {
+      try {
+        const compItem = await pool.query(
+          'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+          [complimentary_item_1]
+        );
+        if (compItem.rows.length > 0) {
+          const currentStock = compItem.rows[0].stock || 0;
+          const currentSold = compItem.rows[0].sold || 0;
+          const newStock = Math.max(0, currentStock - 1);
+          const newSold = currentSold + 1;
+          await pool.query(
+            'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+            [newStock, newSold, complimentary_item_1]
+          );
+          const debouncedEmit = req.app.get('debouncedEmit');
+          debouncedEmit('menuItem:updated', { id: complimentary_item_1, stock: newStock, sold: newSold });
+        }
+      } catch (error) {
+        console.error(`Error processing complimentary item 1:`, error);
+      }
+    }
+
+    if (complimentary_item_2) {
+      try {
+        const compItem = await pool.query(
+          'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+          [complimentary_item_2]
+        );
+        if (compItem.rows.length > 0) {
+          const currentStock = compItem.rows[0].stock || 0;
+          const currentSold = compItem.rows[0].sold || 0;
+          const newStock = Math.max(0, currentStock - 1);
+          const newSold = currentSold + 1;
+          await pool.query(
+            'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+            [newStock, newSold, complimentary_item_2]
+          );
+          const debouncedEmit = req.app.get('debouncedEmit');
+          debouncedEmit('menuItem:updated', { id: complimentary_item_2, stock: newStock, sold: newSold });
+        }
+      } catch (error) {
+        console.error(`Error processing complimentary item 2:`, error);
+      }
+    }
+
     // Update room status to Occupied
     await pool.query('UPDATE rooms SET status = $1 WHERE id = $2', ['Occupied', room_id]);
 
@@ -174,14 +326,16 @@ router.post('/', authenticate, requireAdminOrStaff, async (req, res) => {
     const bookingWithRoom = {
       ...newBooking,
       room_number: roomDetails.rows[0]?.room_number,
-      room_type: roomDetails.rows[0]?.room_type
+      room_type: roomDetails.rows[0]?.room_type,
+      order_items: (newBooking.order_items) ? (typeof newBooking.order_items === 'string' ? JSON.parse(newBooking.order_items) : newBooking.order_items) : [],
+      addons_items: (newBooking.addons_items) ? (typeof newBooking.addons_items === 'string' ? JSON.parse(newBooking.addons_items) : newBooking.addons_items) : []
     };
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('booking:created', bookingWithRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('booking:created', bookingWithRoom);
     if (roomDetails.rows.length > 0) {
-      io.emit('room:updated', roomDetails.rows[0]);
+      debouncedEmit('room:updated', roomDetails.rows[0]);
     }
 
     res.status(201).json(bookingWithRoom);
@@ -242,14 +396,16 @@ router.put('/:id/checkout', authenticate, requireAdminOrStaff, async (req, res) 
     const bookingWithRoom = {
       ...updatedBooking,
       room_number: roomDetails.rows[0]?.room_number,
-      room_type: roomDetails.rows[0]?.room_type
+      room_type: roomDetails.rows[0]?.room_type,
+      order_items: updatedBooking.order_items ? (typeof updatedBooking.order_items === 'string' ? JSON.parse(updatedBooking.order_items) : updatedBooking.order_items) : [],
+      addons_items: updatedBooking.addons_items ? (typeof updatedBooking.addons_items === 'string' ? JSON.parse(updatedBooking.addons_items) : updatedBooking.addons_items) : []
     };
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('booking:updated', bookingWithRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('booking:updated', bookingWithRoom);
     if (roomDetails.rows.length > 0) {
-      io.emit('room:updated', roomDetails.rows[0]);
+      debouncedEmit('room:updated', roomDetails.rows[0]);
     }
 
     res.json(bookingWithRoom);
@@ -265,13 +421,21 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     const { id } = req.params;
     const { room_id, guest_name, guest_contact, number_of_guests, price, notes, status, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items } = req.body;
 
-    // Check if booking exists
-    const existing = await pool.query('SELECT id, room_id FROM bookings WHERE id = $1', [id]);
+    // Check if booking exists and get old data
+    const existing = await pool.query(
+      'SELECT id, room_id, complimentary_item_1, complimentary_item_2, order_items, addons_items FROM bookings WHERE id = $1',
+      [id]
+    );
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const oldRoomId = existing.rows[0].room_id;
+    const oldBooking = existing.rows[0];
+    const oldRoomId = oldBooking.room_id;
+    const oldCompItem1 = oldBooking.complimentary_item_1;
+    const oldCompItem2 = oldBooking.complimentary_item_2;
+    const oldOrderItems = oldBooking.order_items || [];
+    const oldAddonsItems = oldBooking.addons_items || [];
 
     // If room_id is being changed, check if new room is available
     if (room_id && room_id !== oldRoomId) {
@@ -336,6 +500,177 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
 
     const updatedBooking = result.rows[0];
 
+    // If the fallback was used, fetch the booking again to get all fields
+    if (!updatedBooking.order_items && !updatedBooking.addons_items) {
+      const freshBooking = await pool.query(
+        'SELECT id, room_id, guest_name, guest_contact, number_of_guests, price, check_in_date, check_out_date, status, notes, timer_duration, is_complimentary, complimentary_item_1, complimentary_item_2, is_order, order_items, is_addons, addons_items, created_at, updated_at FROM bookings WHERE id = $1',
+        [updatedBooking.id]
+      );
+      Object.assign(updatedBooking, freshBooking.rows[0]);
+    }
+
+    // Handle order items changes
+    if (order_items !== undefined) {
+      const newOrderItems = order_items || [];
+      
+      // Find items that were removed or reduced
+      for (const oldItem of oldOrderItems) {
+        const newItem = newOrderItems.find(n => n.id === oldItem.id);
+        if (!newItem) {
+          // Item was completely removed
+          await revertMenuItemStockAndSales([oldItem], req);
+        } else if (newItem.quantity < oldItem.quantity) {
+          // Item quantity was reduced
+          const diff = oldItem.quantity - newItem.quantity;
+          await revertMenuItemStockAndSales([{ id: oldItem.id, quantity: diff }], req);
+        }
+      }
+
+      // Find items that were added or increased
+      for (const newItem of newOrderItems) {
+        const oldItem = oldOrderItems.find(o => o.id === newItem.id);
+        if (!oldItem) {
+          // Item was added
+          await processMenuItemStockAndSales([newItem], req);
+        } else if (newItem.quantity > oldItem.quantity) {
+          // Item quantity was increased
+          const diff = newItem.quantity - oldItem.quantity;
+          await processMenuItemStockAndSales([{ id: newItem.id, quantity: diff }], req);
+        }
+      }
+    }
+
+    // Handle add-ons items changes
+    if (addons_items !== undefined) {
+      const newAddonsItems = addons_items || [];
+      
+      // Find items that were removed or reduced
+      for (const oldItem of oldAddonsItems) {
+        const newItem = newAddonsItems.find(n => n.id === oldItem.id);
+        if (!newItem) {
+          // Item was completely removed
+          await revertMenuItemStockAndSales([oldItem], req);
+        } else if (newItem.quantity < oldItem.quantity) {
+          // Item quantity was reduced
+          const diff = oldItem.quantity - newItem.quantity;
+          await revertMenuItemStockAndSales([{ id: oldItem.id, quantity: diff }], req);
+        }
+      }
+
+      // Find items that were added or increased
+      for (const newItem of newAddonsItems) {
+        const oldItem = oldAddonsItems.find(o => o.id === newItem.id);
+        if (!oldItem) {
+          // Item was added
+          await processMenuItemStockAndSales([newItem], req);
+        } else if (newItem.quantity > oldItem.quantity) {
+          // Item quantity was increased
+          const diff = newItem.quantity - oldItem.quantity;
+          await processMenuItemStockAndSales([{ id: newItem.id, quantity: diff }], req);
+        }
+      }
+    }
+
+    // Handle complimentary item 1 change
+    if (complimentary_item_1 !== undefined && complimentary_item_1 !== oldCompItem1) {
+      // Revert old item (stock and sold count)
+      if (oldCompItem1) {
+        try {
+          const compItem = await pool.query(
+            'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+            [oldCompItem1]
+          );
+          if (compItem.rows.length > 0) {
+            const currentStock = compItem.rows[0].stock || 0;
+            const currentSold = compItem.rows[0].sold || 0;
+            const newStock = currentStock + 1;
+            const newSold = Math.max(0, currentSold - 1);
+            await pool.query(
+              'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+              [newStock, newSold, oldCompItem1]
+            );
+            const debouncedEmit = req.app.get('debouncedEmit');
+            debouncedEmit('menuItem:updated', { id: oldCompItem1, stock: newStock, sold: newSold });
+          }
+        } catch (error) {
+          console.error(`Error reverting complimentary item 1:`, error);
+        }
+      }
+      // Deduct new item (stock and sold count)
+      if (compItem1) {
+        try {
+          const compItem = await pool.query(
+            'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+            [compItem1]
+          );
+          if (compItem.rows.length > 0) {
+            const currentStock = compItem.rows[0].stock || 0;
+            const currentSold = compItem.rows[0].sold || 0;
+            const newStock = Math.max(0, currentStock - 1);
+            const newSold = currentSold + 1;
+            await pool.query(
+              'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+              [newStock, newSold, compItem1]
+            );
+            const debouncedEmit = req.app.get('debouncedEmit');
+            debouncedEmit('menuItem:updated', { id: compItem1, stock: newStock, sold: newSold });
+          }
+        } catch (error) {
+          console.error(`Error processing complimentary item 1:`, error);
+        }
+      }
+    }
+
+    // Handle complimentary item 2 change
+    if (complimentary_item_2 !== undefined && complimentary_item_2 !== oldCompItem2) {
+      // Revert old item (stock and sold count)
+      if (oldCompItem2) {
+        try {
+          const compItem = await pool.query(
+            'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+            [oldCompItem2]
+          );
+          if (compItem.rows.length > 0) {
+            const currentStock = compItem.rows[0].stock || 0;
+            const currentSold = compItem.rows[0].sold || 0;
+            const newStock = currentStock + 1;
+            const newSold = Math.max(0, currentSold - 1);
+            await pool.query(
+              'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+              [newStock, newSold, oldCompItem2]
+            );
+            const debouncedEmit = req.app.get('debouncedEmit');
+            debouncedEmit('menuItem:updated', { id: oldCompItem2, stock: newStock, sold: newSold });
+          }
+        } catch (error) {
+          console.error(`Error reverting complimentary item 2:`, error);
+        }
+      }
+      // Deduct new item (stock and sold count)
+      if (compItem2) {
+        try {
+          const compItem = await pool.query(
+            'SELECT id, stock, sold FROM menu_items WHERE id = $1',
+            [compItem2]
+          );
+          if (compItem.rows.length > 0) {
+            const currentStock = compItem.rows[0].stock || 0;
+            const currentSold = compItem.rows[0].sold || 0;
+            const newStock = Math.max(0, currentStock - 1);
+            const newSold = currentSold + 1;
+            await pool.query(
+              'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+              [newStock, newSold, compItem2]
+            );
+            const debouncedEmit = req.app.get('debouncedEmit');
+            debouncedEmit('menuItem:updated', { id: compItem2, stock: newStock, sold: newSold });
+          }
+        } catch (error) {
+          console.error(`Error processing complimentary item 2:`, error);
+        }
+      }
+    }
+
     // Update room statuses if room was changed
     if (room_id && room_id !== oldRoomId) {
       // Set old room back to Available
@@ -350,9 +685,9 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
       );
 
       // Emit room update event
-      const io = req.app.get('io');
+      const debouncedEmit = req.app.get('debouncedEmit');
       updatedRooms.rows.forEach(room => {
-        io.emit('room:updated', room);
+        debouncedEmit('room:updated', room);
       });
     }
 
@@ -365,12 +700,14 @@ router.put('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
     const bookingWithRoom = {
       ...updatedBooking,
       room_number: roomDetails.rows[0]?.room_number,
-      room_type: roomDetails.rows[0]?.room_type
+      room_type: roomDetails.rows[0]?.room_type,
+      order_items: (updatedBooking.order_items) ? (typeof updatedBooking.order_items === 'string' ? JSON.parse(updatedBooking.order_items) : updatedBooking.order_items) : [],
+      addons_items: (updatedBooking.addons_items) ? (typeof updatedBooking.addons_items === 'string' ? JSON.parse(updatedBooking.addons_items) : updatedBooking.addons_items) : []
     };
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('booking:updated', bookingWithRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('booking:updated', bookingWithRoom);
 
     res.json(bookingWithRoom);
   } catch (error) {
@@ -384,35 +721,83 @@ router.delete('/:id', authenticate, requireAdminOrStaff, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if booking exists
-    const booking = await pool.query('SELECT id, room_id, status FROM bookings WHERE id = $1', [id]);
+    // Check if booking exists (also pull menu-item related fields so we can
+    // return their stock if the booking being deleted was Checked In)
+    const booking = await pool.query(
+      'SELECT id, room_id, status, order_items, addons_items, complimentary_item_1, complimentary_item_2 FROM bookings WHERE id = $1',
+      [id]
+    ).catch(err => {
+      // Fallback if order_items/addons_items columns don't exist yet
+      if (err.message.includes('column "order_items" of relation "bookings" does not exist') ||
+          err.message.includes('column "addons_items" of relation "bookings" does not exist')) {
+        return pool.query(
+          'SELECT id, room_id, status, complimentary_item_1, complimentary_item_2 FROM bookings WHERE id = $1',
+          [id]
+        );
+      }
+      throw err;
+    });
     if (booking.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
     const roomId = booking.rows[0].room_id;
     const bookingStatus = booking.rows[0].status;
+    const rawOrderItems = booking.rows[0].order_items;
+    const rawAddonsItems = booking.rows[0].addons_items;
+    const compItem1 = booking.rows[0].complimentary_item_1;
+    const compItem2 = booking.rows[0].complimentary_item_2;
 
     await pool.query('DELETE FROM bookings WHERE id = $1', [id]);
 
-    // If booking was checked in, update room status back to Available
+    // If booking was checked in, return any Menu Item stock it was holding
+    // (ordered items, add-ons, and complimentary items) and free up the room
     if (bookingStatus === 'Checked In') {
+      const orderItems = rawOrderItems ? (typeof rawOrderItems === 'string' ? JSON.parse(rawOrderItems) : rawOrderItems) : [];
+      const addonsItems = rawAddonsItems ? (typeof rawAddonsItems === 'string' ? JSON.parse(rawAddonsItems) : rawAddonsItems) : [];
+
+      // Revert stock/sold for ordered items and add-ons
+      await revertMenuItemStockAndSales(orderItems, req);
+      await revertMenuItemStockAndSales(addonsItems, req);
+
+      // Revert complimentary items (stock and sold count)
+      const debouncedEmit = req.app.get('debouncedEmit');
+      for (const compItem of [compItem1, compItem2]) {
+        if (!compItem) continue;
+        try {
+          const menuItem = await pool.query('SELECT id, stock, sold FROM menu_items WHERE id = $1', [compItem]);
+          if (menuItem.rows.length > 0) {
+            const currentStock = menuItem.rows[0].stock || 0;
+            const currentSold = menuItem.rows[0].sold || 0;
+            const newStock = currentStock + 1;
+            const newSold = Math.max(0, currentSold - 1);
+            await pool.query(
+              'UPDATE menu_items SET stock = $1, sold = $2, updated_at = NOW() WHERE id = $3',
+              [newStock, newSold, compItem]
+            );
+            debouncedEmit('menuItem:updated', { id: compItem, stock: newStock, sold: newSold });
+          }
+        } catch (error) {
+          console.error(`Error reverting complimentary item ${compItem}:`, error);
+        }
+      }
+
+      // Update room status back to Available
       await pool.query('UPDATE rooms SET status = $1 WHERE id = $2', ['Available', roomId]);
-      
+
       // Emit room update event
-      const io = req.app.get('io');
       const updatedRoom = await pool.query(
         'SELECT id, room_number, room_type, capacity, status, floor_number FROM rooms WHERE id = $1',
         [roomId]
       );
       if (updatedRoom.rows.length > 0) {
-        io.emit('room:updated', updatedRoom.rows[0]);
+        debouncedEmit('room:updated', updatedRoom.rows[0]);
       }
     }
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('booking:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('booking:deleted', id);
 
     res.json({ message: 'Booking deleted successfully' });
   } catch (error) {
@@ -471,8 +856,8 @@ router.put('/:id/extend', authenticate, requireAdminOrStaff, async (req, res) =>
     };
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('booking:updated', bookingWithRoom);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('booking:updated', bookingWithRoom);
 
     res.json(bookingWithRoom);
   } catch (error) {

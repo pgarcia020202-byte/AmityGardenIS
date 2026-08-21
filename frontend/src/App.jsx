@@ -487,7 +487,12 @@ export default function App() {
       const id = normalizeId(item.id)
       setMenuItems((prev) => {
         const exists = prev.some((i) => normalizeId(i.id) === id)
-        const updated = prev.map((i) => (normalizeId(i.id) === id ? item : i))
+        // Merge instead of replace: the backend sometimes emits partial
+        // payloads (e.g. just { id, stock, sold } after a check-in deducts
+        // stock for order/add-on/complimentary items), so a full replace
+        // would wipe out name/price/category_id locally until the next
+        // full refetch/refresh.
+        const updated = prev.map((i) => (normalizeId(i.id) === id ? { ...i, ...item } : i))
         return exists ? updated : [...updated, item]
       })
     })
@@ -865,6 +870,7 @@ export default function App() {
     // Reload rooms as room status is updated automatically
     const roomsData = await roomsAPI.getAll()
     setRooms(roomsData)
+    return newBooking
   }
 
   async function handleCheckOut(id) {

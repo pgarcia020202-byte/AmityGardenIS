@@ -261,6 +261,14 @@ function BookingDetailsModal({
   menuItems = [],
   menuCategories = []
 }) {
+  /*
+   * CHECK IF ITEM IS OUT OF STOCK (local version for the modal)
+   */
+  const checkOutOfStock = (itemId) => {
+    if (!itemId) return false
+    const item = menuItems.find(m => String(m.id) === String(itemId))
+    return (item?.stock ?? 0) === 0
+  }
   const [isEditing, setIsEditing] = useState(false)
   const [roomSearch, setRoomSearch] = useState('')
   const [roomTypeFilter, setRoomTypeFilter] = useState('All')
@@ -298,18 +306,22 @@ function BookingDetailsModal({
     ? menuItems.filter(item => item.category_id === addonsCategory.id)
     : []
 
-  const orderItems = menuItems.filter(
-    item => item.category_id !== addonsCategory?.id
-  )
+  // Order items should exclude Add-ons (those are selected separately, below).
+  const orderItems = addonsCategory
+    ? menuItems.filter(item => item.category_id !== addonsCategory.id)
+    : menuItems
 
-  const complimentaryItems = menuItems.filter(
-    item => item.category_id !== addonsCategory?.id
-  )
+  // Complimentary items should also exclude Add-ons
+  const complimentaryItems = addonsCategory
+    ? menuItems.filter(item => item.category_id !== addonsCategory.id)
+    : menuItems
 
   /*
    * RESET FORM WHEN BOOKING CHANGES
    */
   useEffect(() => {
+    console.log('BookingDetailsModal viewTarget changed:', JSON.stringify(viewTarget, null, 2))
+    
     // Only reset when booking ID changes, not when other properties change
     if (prevBookingIdRef.current === viewTarget.id) {
       return
@@ -330,7 +342,9 @@ function BookingDetailsModal({
 
     const currentOrderTotal = (viewTarget.order_items || []).reduce(
       (total, order) => {
+        console.log('Processing order item:', order)
         const item = orderItems.find(i => i.id === order.id)
+        console.log('Found menu item:', item)
 
         return (
           total +
@@ -584,6 +598,18 @@ function BookingDetailsModal({
         'Please select at least one complimentary item.'
       )
       return
+    }
+
+    // Check if selected complimentary items are out of stock
+    if (formData.is_complimentary) {
+      if (formData.complimentary_item_1 && checkOutOfStock(formData.complimentary_item_1)) {
+        setModalError('Selected complimentary item 1 is out of stock.')
+        return
+      }
+      if (formData.complimentary_item_2 && checkOutOfStock(formData.complimentary_item_2)) {
+        setModalError('Selected complimentary item 2 is out of stock.')
+        return
+      }
     }
 
     if (
@@ -1189,7 +1215,7 @@ function BookingDetailsModal({
                         key={item.id}
                         value={item.id}
                       >
-                        {item.name}
+                        {item.name} {(item.stock ?? 0) === 0 ? '(Out of Stock)' : `(Stock: ${item.stock})`}
                       </option>
                     ))}
                   </select>
@@ -1222,7 +1248,7 @@ function BookingDetailsModal({
                         key={item.id}
                         value={item.id}
                       >
-                        {item.name}
+                        {item.name} {(item.stock ?? 0) === 0 ? '(Out of Stock)' : `(Stock: ${item.stock})`}
                       </option>
                     ))}
                   </select>
@@ -1251,6 +1277,8 @@ function BookingDetailsModal({
                           o => o.id === item.id
                         )?.quantity || 0
 
+                      const itemOutOfStock = (item.stock ?? 0) === 0
+
                       return (
                         <div
                           key={item.id}
@@ -1258,7 +1286,7 @@ function BookingDetailsModal({
                         >
                           <div className="flex-1 min-w-0">
                             <span className="text-sm text-slate-700">
-                              {item.name}
+                              {item.name} {itemOutOfStock ? '(Out of Stock)' : `(Stock: ${item.stock})`}
                             </span>
 
                             <span className="text-xs text-slate-400 ml-2">
@@ -1298,7 +1326,8 @@ function BookingDetailsModal({
                                     updatedOrder
                                 })
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               -
                             </button>
@@ -1328,7 +1357,8 @@ function BookingDetailsModal({
                                     updatedOrder
                                 })
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               +
                             </button>
@@ -1401,6 +1431,8 @@ function BookingDetailsModal({
                           a => a.id === item.id
                         )?.quantity || 0
 
+                      const itemOutOfStock = (item.stock ?? 0) === 0
+
                       return (
                         <div
                           key={item.id}
@@ -1408,7 +1440,7 @@ function BookingDetailsModal({
                         >
                           <div className="flex-1 min-w-0">
                             <span className="text-sm text-slate-700">
-                              {item.name}
+                              {item.name} {itemOutOfStock ? '(Out of Stock)' : `(Stock: ${item.stock})`}
                             </span>
 
                             <span className="text-xs text-slate-400 ml-2">
@@ -1448,7 +1480,8 @@ function BookingDetailsModal({
                                     updatedAddons
                                 })
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               -
                             </button>
@@ -1478,7 +1511,8 @@ function BookingDetailsModal({
                                     updatedAddons
                                 })
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               +
                             </button>
@@ -1680,6 +1714,15 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
   const [expiredTimers, setExpiredTimers] = useState(new Set())
   const highlightedRowRef = useRef(null)
 
+  /*
+   * CHECK IF ITEM IS OUT OF STOCK
+   */
+  const isOutOfStock = (itemId) => {
+    if (!itemId) return false
+    const item = menuItems.find(m => String(m.id) === String(itemId))
+    return (item?.stock ?? 0) === 0
+  }
+
   // Scroll to highlighted booking when highlightedBookingId changes
   useEffect(() => {
     if (highlightedBookingId && highlightedRowRef.current) {
@@ -1848,8 +1891,19 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
     if (!formData.number_of_guests || formData.number_of_guests <= 0) { setError('Number of guests must be greater than 0.'); return }
     if (!formData.base_price || parseFloat(formData.base_price) < 0) { setError('Base price is required and cannot be negative.'); return }
     if (!formData.timer_duration || formData.timer_duration <= 0) { setError('Timer duration must be greater than 0.'); return }
-    if (formData.is_complimentary && !formData.complimentary_item_1 && !formData.complimentary_item_2) { 
-      setError('Please select at least one complimentary item.'); return 
+    if (formData.is_complimentary && !formData.complimentary_item_1 && !formData.complimentary_item_2) {
+      setError('Please select at least one complimentary item.'); return
+    }
+    // Check if selected complimentary items are out of stock
+    if (formData.is_complimentary) {
+      if (formData.complimentary_item_1 && isOutOfStock(formData.complimentary_item_1)) {
+        setError('Selected complimentary item 1 is out of stock.')
+        return
+      }
+      if (formData.complimentary_item_2 && isOutOfStock(formData.complimentary_item_2)) {
+        setError('Selected complimentary item 2 is out of stock.')
+        return
+      }
     }
     if (formData.is_addons && formData.addons_items.filter(item => item.quantity > 0).length === 0) {
       setError('Please select at least one add-on item with quantity.'); return
@@ -1876,7 +1930,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
         is_addons: Boolean(formData.is_addons),
         addons_items: formData.addons_items.filter(item => item.quantity > 0)
       }
-      await onCheckIn(formDataInMinutes)
+      const result = await onCheckIn(formDataInMinutes)
       setFormData({
         room_id: '',
         guest_name: '',
@@ -1895,6 +1949,10 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
       })
       setError('')
       setAddOpen(false)
+      // Set viewTarget to the returned booking data to show correct information
+      if (result) {
+        setViewTarget(result)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to check in')
     } finally {
@@ -2307,7 +2365,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     >
                       {!formData.complimentary_item_1 && <option value="">Select item</option>}
                       {complimentaryItems.map(item => (
-                        <option key={item.id} value={item.id}>{item.name}</option>
+                        <option key={item.id} value={item.id}>{item.name} {(item.stock ?? 0) === 0 ? '(Out of Stock)' : `(Stock: ${item.stock})`}</option>
                       ))}
                     </select>
                   </div>
@@ -2320,7 +2378,7 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     >
                       {!formData.complimentary_item_2 && <option value="">Select item</option>}
                       {complimentaryItems.map(item => (
-                        <option key={item.id} value={item.id}>{item.name}</option>
+                        <option key={item.id} value={item.id}>{item.name} {(item.stock ?? 0) === 0 ? '(Out of Stock)' : `(Stock: ${item.stock})`}</option>
                       ))}
                     </select>
                   </div>
@@ -2333,11 +2391,15 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     {orderItems.length === 0 ? (
                       <p className="text-sm text-slate-400 text-center py-2">No menu items available for order</p>
                     ) : (
-                      orderItems.map(item => (
-                        <div key={item.id} className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-slate-700">{item.name}</span>
-                            <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
+                      orderItems.map(item => {
+                        const currentQty = formData.order_items.find(o => o.id === item.id)?.quantity || 0
+                        const itemOutOfStock = (item.stock ?? 0) === 0
+
+                        return (
+                          <div key={item.id} className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-slate-700">{item.name} {itemOutOfStock ? '(Out of Stock)' : `(Stock: ${item.stock})`}</span>
+                              <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <button
@@ -2352,7 +2414,8 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                                   setFormData({ ...formData, order_items: updatedOrder })
                                 }
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               -
                             </button>
@@ -2368,13 +2431,15 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                                   .concat({ id: item.id, quantity: currentQty + 1 })
                                 setFormData({ ...formData, order_items: updatedOrder })
                               }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
+                              disabled={itemOutOfStock}
+                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               +
                             </button>
                           </div>
                         </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                   {formData.order_items.length > 0 && (
@@ -2405,48 +2470,55 @@ export default function CheckInOutPage({ bookings, rooms, currentUser, onCheckIn
                     {addonsItems.length === 0 ? (
                       <p className="text-sm text-slate-400 text-center py-2">No add-ons available</p>
                     ) : (
-                      addonsItems.map(item => (
-                        <div key={item.id} className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm text-slate-700">{item.name}</span>
-                            <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
-                                if (currentQty > 0) {
+                      addonsItems.map(item => {
+                        const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
+                        const itemOutOfStock = (item.stock ?? 0) === 0
+
+                        return (
+                          <div key={item.id} className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-slate-700">{item.name} {itemOutOfStock ? '(Out of Stock)' : `(Stock: ${item.stock})`}</span>
+                              <span className="text-xs text-slate-400 ml-2">₱{parseFloat(item.price).toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
+                                  if (currentQty > 0) {
+                                    const updatedAddons = formData.addons_items
+                                      .filter(a => a.id !== item.id)
+                                      .concat({ id: item.id, quantity: currentQty - 1 })
+                                      .filter(a => a.quantity > 0)
+                                    setFormData({ ...formData, addons_items: updatedAddons })
+                                  }
+                                }}
+                                disabled={itemOutOfStock}
+                                className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                -
+                              </button>
+                              <span className="w-8 text-center text-sm text-slate-700">
+                                {formData.addons_items.find(a => a.id === item.id)?.quantity || 0}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
                                   const updatedAddons = formData.addons_items
                                     .filter(a => a.id !== item.id)
-                                    .concat({ id: item.id, quantity: currentQty - 1 })
-                                    .filter(a => a.quantity > 0)
+                                    .concat({ id: item.id, quantity: currentQty + 1 })
                                   setFormData({ ...formData, addons_items: updatedAddons })
-                                }
-                              }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
-                            >
-                              -
-                            </button>
-                            <span className="w-8 text-center text-sm text-slate-700">
-                              {formData.addons_items.find(a => a.id === item.id)?.quantity || 0}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentQty = formData.addons_items.find(a => a.id === item.id)?.quantity || 0
-                                const updatedAddons = formData.addons_items
-                                  .filter(a => a.id !== item.id)
-                                  .concat({ id: item.id, quantity: currentQty + 1 })
-                                setFormData({ ...formData, addons_items: updatedAddons })
-                              }}
-                              className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm"
-                            >
-                              +
-                            </button>
+                                }}
+                                disabled={itemOutOfStock}
+                                className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                +
+                              </button>
                           </div>
                         </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                   {formData.addons_items.length > 0 && (

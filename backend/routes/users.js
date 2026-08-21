@@ -72,8 +72,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     const newUser = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('user:created', newUser);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('user:created', newUser);
 
     res.status(201).json(newUser);
   } catch (error) {
@@ -146,8 +146,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     const updatedUser = result.rows[0];
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('user:updated', updatedUser);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('user:updated', updatedUser);
 
     res.json(updatedUser);
   } catch (error) {
@@ -179,8 +179,8 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
 
     // Emit socket event for real-time update
-    const io = req.app.get('io');
-    io.emit('user:deleted', id);
+    const debouncedEmit = req.app.get('debouncedEmit');
+    debouncedEmit('user:deleted', id);
 
     res.status(204).send();
   } catch (error) {
